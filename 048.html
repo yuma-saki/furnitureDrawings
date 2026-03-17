@@ -1,0 +1,2142 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>建具・家具作図ツール V114.8 - 固定棚トグル・全角対応・扉連動補正</title>
+    <style>
+        /* --- 永久不変のオリジナルCSS（絶対にいじらない） --- */
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #eef2f3; padding: 20px; display: flex; flex-direction: column; align-items: center; margin: 0; }
+        .container { width: 1650px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); display: grid; grid-template-columns: 440px 1fr; gap: 20px; }
+        h1 { grid-column: 1 / -1; font-size: 18px; text-align: center; color: #2c3e50; border-bottom: 3px solid #e67e22; padding-bottom: 10px; margin-top:0; }
+        .controls { display: flex; flex-direction: column; gap: 6px; max-height: 92vh; overflow-y: auto; padding-right: 15px; }
+        .group { background: #fff5eb; padding: 10px; border-radius: 8px; border-left: 5px solid #e67e22; margin-bottom: 4px; }
+        .group-title { font-size: 11px; color: #d35400; margin-bottom: 6px; text-transform: uppercase; font-weight: bold; border-bottom: 1px solid #ffdec0; }
+        label { font-size: 11px; font-weight: bold; color: #333; display: block; margin-top: 4px; }
+        input[type="text"], input[type="number"], select { width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 13px; }
+        .btn-main { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: bold; color: white; box-shadow: 0 4px 0 rgba(0,0,0,0.2); }
+        .btn-orange { background: #e67e22; }
+        .btn-blue { background: #3498db; }
+        .btn-dark { background: #34495e; }
+        .preview-area { background: #dcdde1; display: grid; grid-template-columns: 1fr 40px; grid-template-rows: 1fr 40px; border: 2px solid #7f8fa6; position: relative; overflow: hidden; }
+        .canvas-wrapper { grid-column: 1; grid-row: 1; display: flex; justify-content: center; align-items: center; overflow: hidden; background: #555; }
+        canvas { background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.2); cursor: grab; width: 100%; height: auto; max-height: 100%; object-fit: contain; touch-action: none; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+        .slider-v { grid-column: 2; grid-row: 1; display: flex; justify-content: center; padding: 20px 0; background: #f1f2f6; border-left: 1px solid #ccc; }
+        .slider-h { grid-column: 1; grid-row: 2; display: flex; align-items: center; padding: 0 20px; background: #f1f2f6; border-top: 1px solid #ccc; }
+        input[type=range] { writing-mode: bt-lr; appearance: slider-vertical; width: 8px; height: 100%; cursor: pointer; }
+        .slider-h input { width: 100%; height: 8px; writing-mode: initial; appearance: auto; }
+
+        .btn-add { background: #27ae60; padding: 6px; font-size: 11px; margin-top: 5px; border: none; border-radius: 4px; color: white; cursor: pointer; width: 120px; }
+        .btn-del { background: #e74c3c; padding: 2px 5px; font-size: 10px; border: none; border-radius: 4px; color: white; height: 24px; cursor: pointer; }
+        .btn-copy { background: #3498db; padding: 2px 5px; font-size: 10px; border: none; border-radius: 4px; color: white; height: 24px; cursor: pointer; }
+        
+        .spec-row { display: grid; grid-template-columns: 80px 1fr 30px; gap: 5px; margin-bottom: 4px; }
+
+        .scale-btn-group { display: flex; gap: 2px; margin-top: 4px; }
+        .btn-scale { flex: 1; padding: 3px 0; font-size: 10px; background: #fff; border: 1px solid #e67e22; color: #e67e22; border-radius: 4px; cursor: pointer; transition: 0.2s; }
+        .btn-scale:hover { background: #e67e22; color: #fff; }
+
+        @media print {
+            @page { size: A3 landscape; margin: 0; }
+            * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            body, html { width: 420mm !important; height: 297mm !important; margin: 0 !important; padding: 0 !important; background: white !important; overflow: hidden !important; }
+            .controls, h1, .hint-badge, .slider-v, .slider-h, .action-buttons { display: none !important; }
+            .container { display: block !important; width: 420mm !important; height: 297mm !important; margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; position: fixed; top: 0; left: 0; }
+            .preview-area, .canvas-wrapper { width: 420mm !important; height: 297mm !important; border: none !important; background: white !important; display: block !important; }
+            canvas { width: 420mm !important; height: 297mm !important; display: block !important; image-rendering: auto; }
+        }
+    </style>
+</head>
+<body onload="initApp()">
+
+<div class="container">
+    <h1>建具・家具 統合作図ツール V114.8 (固定棚トグル・全角対応・扉連動)</h1>
+    <div class="controls">
+        <div class="group" style="background: #e8f6f3; border-left-color: #1abc9c;">
+            <div class="group-title" style="color: #16a085;">0. プロジェクト管理</div>
+            <div class="row-btns" style="margin-bottom: 5px;">
+                <button class="btn-main btn-blue" style="padding:8px;" onclick="saveProjectFile()">保存</button>
+                <button class="btn-main btn-gray" style="padding:8px;" onclick="document.getElementById('loadFile').click()">開く</button>
+                <input type="file" id="loadFile" style="display:none" accept=".json" onchange="loadProjectFile(this)">
+            </div>
+            <button class="btn-main btn-dark" style="padding:5px; width:100%; font-size:11px;" onclick="resetToDefault()">新規作成</button>
+        </div>
+
+        <div class="group">
+            <div class="group-title">1. 図面情報 (表題欄)</div>
+            <label>会社名</label><input type="text" id="compName" value="(株) 崎原工房" oninput="drawPreview()">
+            <label>工事名</label><input type="text" id="pjName" value="〇〇邸 新築工事" oninput="drawPreview()">
+            <label>図面名</label><input type="text" id="dwgName" value="家具姿図・詳細図" oninput="drawPreview()">
+            <div style="display:flex; gap:5px;">
+                <div style="flex: 1.5;">
+                    <label>縮尺</label>
+                    <input type="text" id="scaleStr" value="1/20" oninput="drawPreview()">
+                    <div class="scale-btn-group">
+                        <button class="btn-scale" onclick="setScale('1/10')">1/10</button>
+                        <button class="btn-scale" onclick="setScale('1/15')">1/15</button>
+                        <button class="btn-scale" onclick="setScale('1/20')">1/20</button>
+                        <button class="btn-scale" onclick="setScale('1/30')">1/30</button>
+                    </div>
+                </div>
+                <div><label>日付</label><input type="text" id="dateStr" value="2026/03/16" oninput="drawPreview()"></div>
+                <div><label>担当</label><input type="text" id="managerStr" value="設計部" oninput="drawPreview()"></div>
+                <div><label>図番</label><input type="text" id="dwgNoStr" value="A-01" oninput="drawPreview()"></div>
+            </div>
+        </div>
+
+        <div class="group">
+            <div class="group-title">2. 基本寸法・タイプ</div>
+            <div style="margin-bottom: 8px; background: #fff; padding: 5px; border-radius: 4px; border: 1px solid #ffd1a4;">
+                <label>作図タイプ</label>
+                <select id="doorType" onchange="drawPreview()">
+                    <option value="standard">建具：標準（1枚）</option>
+                    <option value="single">建具：片開き</option>
+                    <option value="double">建具：両開き</option>
+                    <option value="furniture" style="background:#e8f8f5; font-weight:bold;" selected>【家具】収納棚（オープン・扉）</option>
+                </select>
+            </div>
+            <div style="display:flex; gap:5px;">
+                <div><label>全幅 (W)</label><input type="number" id="w" value="1800" oninput="drawPreview()"></div>
+                <div><label>全高 (H)</label><input type="number" id="h" value="850" oninput="drawPreview()"></div>
+            </div>
+            <div style="display:flex; gap:5px; margin-top:5px; background: #fff; padding: 5px; border-radius: 4px; border: 1px solid #ffd1a4;">
+                <div style="flex:1;"><label>左右(X)</label><input type="number" id="offX" value="0" oninput="syncSlider('X')" step="10"></div>
+                <div style="flex:1;"><label>上下(Y)</label><input type="number" id="offY" value="0" oninput="syncSlider('Y')" step="10"></div>
+            </div>
+            <label>見込み(D) ※扉を含む総奥行</label><input type="number" id="d" value="450" oninput="drawPreview()">
+        </div>
+
+        <div class="group">
+            <div class="group-title">3. 仕上・金物仕様</div>
+            <div id="specContainer"></div>
+            <button class="btn-add" onclick="addRow()">＋ 行を追加</button>
+            <div style="margin-top:10px;">
+                <label>特記事項</label>
+                <input type="text" id="specNote" value="＊現場寸法確認の上製作" style="color:#c0392b;" oninput="drawPreview()">
+            </div>
+        </div>
+
+        <div class="group" id="freeTextGroup" style="background: #f9ebea; border-left-color: #c0392b;">
+            <div class="group-title" style="color: #922b21;">8. 自由テキスト配置 (コピペ可能)</div>
+            <div id="extraTextContainer" style="display:flex; flex-direction:column; gap:3px;"></div>
+            <button class="btn-add" style="width:100%; margin-top:5px; padding:8px; background: #c0392b;" onclick="addTextRow()">＋ テキスト追加</button>
+        </div>
+
+        <div class="group" id="eraserGroup" style="background: #fdedec; border-left-color: #e74c3c;">
+            <div class="group-title" style="color: #c0392b;">9. 独立消しゴム・編集ツール</div>
+            <div style="display:flex; gap:5px;">
+                <button class="btn-main btn-dark" id="eraserModeBtn" onclick="toggleEraser()">消しゴム (OFF)</button>
+                <button class="btn-main" style="background:#c0392b; color:white; padding:5px; font-size:11px;" onclick="undoEraser()">1つ戻す</button>
+            </div>
+            <div style="font-size: 10px; color: #c0392b; margin-top: 5px;">※消しゴムONで要素をクリックすると消去。<br>※「1つ戻す」で最後に消去したものを復元します。</div>
+        </div>
+
+        <div class="group" id="furnitureGroup" style="background: #eaf2f8; border-left-color: #2980b9; display:none;">
+            <div class="group-title" style="color: #1a5276;">10. 家具詳細設定</div>
+            
+            <div style="display:flex; gap:10px; align-items:center; background: #fff; padding: 5px; border: 1px solid #2980b9; border-radius: 4px; margin-bottom:5px;">
+                <span style="font-size:10px; font-weight:bold; color:#1a5276;">内部構造：</span>
+                <label style="display:flex; align-items:center; gap:3px; cursor:pointer; font-size:10px;" title="可動棚(棚板)は中縦で区切られます">
+                    <input type="radio" name="fWin" id="fWinV" value="V" checked onchange="drawPreview()">中縦勝ち
+                </label>
+                <label style="display:flex; align-items:center; gap:3px; cursor:pointer; font-size:10px;" title="可動棚(棚板)も側板まで貫通します">
+                    <input type="radio" name="fWin" id="fWinH" value="H" onchange="drawPreview()">横(棚)勝ち
+                </label>
+            </div>
+
+            <div style="margin-bottom: 8px; padding: 5px; background: #fff; border: 1px solid #2980b9; border-radius: 4px;">
+                <div style="display:flex; gap:10px; flex-wrap: wrap; margin-bottom:5px;">
+                    <label style="display:flex; align-items:center; gap:3px; cursor:pointer; font-size:10px;">
+                        <input type="checkbox" id="fTenGachi" onchange="drawPreview()" checked>天板勝ち
+                    </label>
+                    <label style="display:flex; align-items:center; gap:3px; cursor:pointer; font-size:10px;">
+                        <input type="checkbox" id="fChiGachi" onchange="drawPreview()" checked>底板勝ち
+                    </label>
+                    <label style="display:flex; align-items:center; gap:3px; cursor:pointer; font-size:10px; color:#c0392b;">
+                        <input type="checkbox" id="fUsePillar" onchange="drawPreview()" checked>棚柱
+                    </label>
+                    <label style="display:flex; align-items:center; gap:3px; cursor:pointer; font-size:10px; color:#c0392b;">
+                        <input type="checkbox" id="fUseDowel" onchange="drawPreview()" checked>ダボ
+                    </label>
+                    <label style="display:flex; align-items:center; gap:3px; cursor:pointer; font-size:10px; color:#7f8fa6;">
+                        <input type="checkbox" id="fUseDash" onchange="drawPreview()">可動表現(破線)
+                    </label>
+                </div>
+                <div style="display:flex; gap:5px;">
+                    <div><label>平面図離れ</label><input type="number" id="fPlanOff" value="500" oninput="drawPreview()"></div>
+                    <div><label>断面図離れ</label><input type="number" id="fSecOff" value="300" oninput="drawPreview()"></div>
+                </div>
+            </div>
+            <div style="display:flex; gap:5px;">
+                <div><label>側板厚</label><input type="number" id="fSideT" value="20" oninput="drawPreview()"></div>
+                <div><label>天板厚</label><input type="number" id="fTopT" value="20" oninput="drawPreview()"></div>
+                <div><label>底板厚</label><input type="number" id="fBotT" value="20" oninput="drawPreview()"></div>
+            </div>
+            
+            <div style="display:flex; gap:5px; margin-top:5px;">
+                <div style="flex:1;"><label>中縦(枚数)</label><input type="number" id="fVCount" value="2" oninput="drawPreview()"></div>
+                <div style="flex:1;"><label>中縦厚</label><input type="number" id="fVThick" value="20" oninput="drawPreview()"></div>
+                <div style="flex:1.5;"><label title="左から順に指定。自動計算は auto">スパン割付 (auto等)</label><input type="text" id="fVSpans" value="" placeholder="例: 300, auto, 300" oninput="drawPreview()" style="background:#fffbcc; border-color:#f1c40f;"></div>
+                <div style="flex:0.5; text-align:center;"><label>有効</label><br><input type="checkbox" id="fVUse" checked onchange="drawPreview()"></div>
+            </div>
+            
+            <div style="display:flex; gap:5px; margin-top:5px; padding: 5px; background: #eaf8e6; border: 2px solid #27ae60; border-radius: 4px;">
+                <div style="flex:1.5; display:flex; flex-direction:column; gap:2px;">
+                    <label style="color:#27ae60;">可動棚枚数 (上から順にカンマ区切)</label>
+                    <input type="text" id="fHCount" value="2" placeholder="例: 3, 1 (上が3枚, 下が1枚)" oninput="drawPreview()">
+                </div>
+                <div style="flex:1;"><label style="color:#27ae60;">可動棚厚</label><input type="number" id="fShelfT" value="20" oninput="drawPreview()"></div>
+                <div style="flex:0.5; text-align:center;"><label style="color:#27ae60;">有効</label><br><input type="checkbox" id="fHUse" checked onchange="drawPreview()"></div>
+            </div>
+
+            <div style="display:flex; gap:5px; margin-top:5px; padding: 5px; background: #fef9e7; border: 2px solid #e67e22; border-radius: 4px;">
+                <div style="flex:1.5; display:flex; flex-direction:column; gap:2px;">
+                    <label style="color:#d35400;">中横・固定棚</label>
+                    <div style="display:flex; gap:5px;">
+                        <input type="text" id="fFixedHeights" value="" placeholder="底板からの高さをカンマ区切り (例: 400, 800)" oninput="drawPreview()">
+                        <button class="btn-main" style="background:#bdc3c7; color:#333; padding: 4px 8px; font-size: 10px; width:auto;" onclick="deletedShelves.clear(); drawPreview();">復元</button>
+                    </div>
+                    <label style="font-size:10px; display:flex; align-items:center; gap:3px; cursor:pointer; margin-top:2px;">
+                        <input type="checkbox" id="fFixedWin" checked onchange="drawPreview()"> 横勝ち (側板・中立を貫通)
+                    </label>
+                </div>
+                <div style="flex:1;">
+                    <label style="color:#d35400;">中横 厚み</label>
+                    <input type="number" id="fFixedT" value="20" oninput="drawPreview()">
+                </div>
+                <div style="flex:1;">
+                    <label style="color:#d35400;" title="扉との隙間を埋めるため手前に伸ばします">中横 前伸ばし</label>
+                    <input type="number" id="fFixedExtend" value="0" oninput="drawPreview()">
+                </div>
+                <div style="flex:1;">
+                    <label style="color:#d35400;" title="プラスで食い込み、マイナスで隙間が空きます">中立 伸ばし(-で縮む)</label>
+                    <input type="number" id="fVExtend" value="0" step="5" oninput="drawPreview()">
+                </div>
+            </div>
+            <div style="display:flex; gap:5px; margin-top:5px; background: #fff; padding: 5px; border: 1px solid #2980b9; border-radius: 4px;">
+                <div style="flex:1.5;"><label>幕板高 (天板上へ伸びる)</label><input type="number" id="fMakuitaH" value="100" oninput="drawPreview()"></div>
+                <div style="flex:0.5; text-align:center;"><label>幕板有効</label><br><input type="checkbox" id="fMakuitaUse" onchange="drawPreview()"></div>
+            </div>
+
+            <div style="margin-top:5px; display:flex; gap:10px; align-items:flex-end;">
+                <div style="flex:1;">
+                    <label>台輪高</label><input type="number" id="fPlinthH" value="60" oninput="drawPreview()">
+                </div>
+                <div style="flex:1;">
+                    <label style="cursor: pointer; background: #2980b9; color: white; padding: 4px 8px; border-radius: 4px; font-weight: normal; font-size: 11px; display:inline-block; margin-bottom: 2px;">
+                        <input type="checkbox" id="fPlinthToggle" checked onchange="drawPreview()" style="width: auto; margin: 0 4px 0 0;">台輪 ON/OFF
+                    </label>
+                </div>
+            </div>
+
+            <div style="margin-top:5px; display:flex; gap:10px; align-items:flex-end; padding: 5px; background: #f4ecf7; border: 1px solid #8e44ad; border-radius: 4px;">
+                <div style="flex:1.5;">
+                    <label style="color:#8e44ad;">背板 (裏空き / 厚み / 溝深さ)</label>
+                    <div style="display:flex; gap:5px;">
+                        <input type="number" id="fBackOff" value="12" oninput="drawPreview()" title="裏からの空き">
+                        <input type="number" id="fBackT" value="3" oninput="drawPreview()" title="背板の厚み">
+                        <input type="number" id="fBackIns" value="6" oninput="drawPreview()" title="溝への飲み込み">
+                    </div>
+                </div>
+                <div style="flex:1;">
+                    <label style="cursor: pointer; background: #8e44ad; color: white; padding: 4px 8px; border-radius: 4px; font-weight: normal; font-size: 11px; display:inline-block; margin-bottom: 2px;">
+                        <input type="checkbox" id="fBackToggle" checked onchange="drawPreview()" style="width: auto; margin: 0 4px 0 0;">背板 ON/OFF
+                    </label>
+                </div>
+            </div>
+            </div>
+
+        <div class="group" id="doorGroup" style="background: #fdf2e9; border-left-color: #d35400; display:none;">
+            <div class="group-title" style="color: #a04000; display:flex; justify-content:space-between; align-items:center;">
+                <span>11. 扉設定 (多段・固定棚連動)</span>
+                <label style="cursor: pointer; background: #e67e22; color: white; padding: 2px 8px; border-radius: 4px; font-weight: normal; font-size: 11px;">
+                    <input type="checkbox" id="fDoorToggle" checked onchange="drawPreview()" style="width: auto; margin: 0 4px 0 0;">扉 ON/OFF
+                </label>
+            </div>
+            
+            <div style="display:flex; gap:10px; align-items:center; background: #fff; padding: 5px; border: 1px solid #d35400; border-radius: 4px; margin-bottom: 5px; margin-top: 5px;">
+                <div style="flex:1;">
+                    <label style="color:#d35400;">扉 仕上げタイプ</label>
+                    <select id="fDoorStyle" onchange="drawPreview()">
+                        <option value="flash" selected>フラッシュ (装飾なし)</option>
+                        <option value="kamachi">框扉 (パネル)</option>
+                        <option value="glass">ガラス扉 (框組)</option>
+                        <option value="garari">ガラリ扉</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display:flex; gap:5px; margin-bottom: 5px;">
+                <div style="flex:1; background: #fff; padding: 5px; border: 1px solid #e67e22; border-radius: 4px;">
+                    <label>縦框(見付)</label><input type="number" id="fKamachiV" value="60" oninput="drawPreview()">
+                </div>
+                <div style="flex:1; background: #fff; padding: 5px; border: 1px solid #e67e22; border-radius: 4px;">
+                    <label>上桟</label><input type="number" id="fKamachiTop" value="60" oninput="drawPreview()">
+                </div>
+                <div style="flex:1; background: #fff; padding: 5px; border: 1px solid #e67e22; border-radius: 4px;">
+                    <label>下桟</label><input type="number" id="fKamachiBot" value="60" oninput="drawPreview()">
+                </div>
+            </div>
+            <div style="display:flex; gap:5px; margin-bottom: 5px;">
+                <div style="flex:1; background: #fff; padding: 5px; border: 1px solid #e67e22; border-radius: 4px;">
+                    <label>中桟 (本数)</label><input type="number" id="fNakazanCount" value="0" oninput="drawPreview()">
+                </div>
+                <div style="flex:1; background: #fff; padding: 5px; border: 1px solid #e67e22; border-radius: 4px;">
+                    <label>中桟 (幅)</label><input type="number" id="fNakazanW" value="60" oninput="drawPreview()">
+                </div>
+            </div>
+
+            <div style="display:flex; gap:10px; align-items:center; background: #fff; padding: 5px; border: 1px solid #d35400; border-radius: 4px; margin-bottom: 5px;">
+                <div style="flex:2;">
+                    <label style="color:#d35400;">納まり (左右かぶせ・引き戸)</label>
+                    <select id="fDoorOverlay" onchange="drawPreview()">
+                        <option value="full">全かぶせ (16mm)</option>
+                        <option value="half">半かぶせ (8mm)</option>
+                        <option value="inset" selected>インセット (両サイド2mm隙間)</option>
+                        <option value="sliding">引き違い (20mm重なり・枚数は段設定に連動)</option>
+                        <option value="parting">引き分け (中央突き付け・両脇20mm重なり)</option>
+                    </select>
+                </div>
+                <div style="flex:2;">
+                    <label style="color:#d35400;">上下インセット</label>
+                    <div style="display:flex; gap:10px; margin-top:5px;">
+                        <label style="display:flex; align-items:center; gap:3px; cursor:pointer; font-size:10px; color:#d35400;" title="引き戸・引き分け選択時は強制的に枠内になります">
+                            <input type="checkbox" id="fDoorTopInset" onchange="drawPreview()" checked>天板勝ち
+                        </label>
+                        <label style="display:flex; align-items:center; gap:3px; cursor:pointer; font-size:10px; color:#d35400;" title="引き戸・引き分け選択時は強制的に枠内になります">
+                            <input type="checkbox" id="fDoorBotInset" onchange="drawPreview()">底板勝ち
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:5px; align-items:center; background: #fff; padding: 5px; border: 1px solid #d35400; border-radius: 4px; margin-bottom: 5px;">
+                <div style="flex:1;">
+                    <label style="color:#d35400;">段数 (固定棚連動)</label>
+                    <select id="fDoorVSplit" onchange="drawPreview()">
+                        <option value="1" selected>1段 (全面)</option>
+                        <option value="2">2段 (上下)</option>
+                        <option value="3">3段 (上中下)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div style="font-size:10px; color:#d35400; margin-bottom:8px; line-height:1.2;">
+                ※ 引戸・引分選択時、下の指定枚数が扉の枚数になります（autoは2枚。4枚なども可）。<br>
+                ※ 4枚建てにすると、引き違いは4枚連動、引き分けは前2後2の2レール構成になります。
+            </div>
+
+            <div style="display:flex; gap:5px; margin-bottom: 5px;">
+                <div style="flex:1.2; padding:5px; border:1px solid #e67e22; border-radius:4px; background:#fff;">
+                    <label style="color:#d35400; margin-bottom:4px;" id="labelDoorTop">上段 (枚数 / 吊り元)</label>
+                    <input type="text" id="fDoorCountTop" value="auto" oninput="drawPreview()" placeholder="枚数 (例: 2, 4)" style="margin-bottom:3px; font-weight:bold; border-color:#e67e22;">
+                    <input type="text" id="fHingeTop" value="" oninput="drawPreview()" placeholder="吊元 (例: L, L, R, R)" style="background:#fffbcc; border-color:#f1c40f; font-size:11px;" title="空欄で自動。指定する場合は左扉から順に L か R をカンマ区切りで入力">
+                </div>
+                <div style="flex:1.2; padding:5px; border:1px solid #e67e22; border-radius:4px; background:#fff;" id="wrapDoorMid">
+                    <label style="color:#d35400; margin-bottom:4px;">中段 (枚数 / 吊り元)</label>
+                    <input type="text" id="fDoorCountMid" value="0" oninput="drawPreview()" placeholder="枚数" style="margin-bottom:3px; font-weight:bold; border-color:#e67e22;">
+                    <input type="text" id="fHingeMid" value="" oninput="drawPreview()" placeholder="吊元" style="background:#fffbcc; border-color:#f1c40f; font-size:11px;">
+                </div>
+                <div style="flex:1.2; padding:5px; border:1px solid #e67e22; border-radius:4px; background:#fff;" id="wrapDoorBot">
+                    <label style="color:#d35400; margin-bottom:4px;">下段 (枚数 / 吊り元)</label>
+                    <input type="text" id="fDoorCountBot" value="auto" oninput="drawPreview()" placeholder="枚数" style="margin-bottom:3px; font-weight:bold; border-color:#e67e22;">
+                    <input type="text" id="fHingeBot" value="" oninput="drawPreview()" placeholder="吊元" style="background:#fffbcc; border-color:#f1c40f; font-size:11px;">
+                </div>
+            </div>
+
+            <div style="display:flex; gap:5px; padding: 5px; background: #fff; border: 1px solid #d35400; border-radius: 4px;">
+                <div style="flex:1;">
+                    <label style="color:#d35400;">扉 上すきま</label>
+                    <input type="number" id="fDoorGapT" value="2" oninput="drawPreview()">
+                </div>
+                <div style="flex:1;" id="wrapGapMid">
+                    <label style="color:#d35400;">段のすきま(チリ)</label>
+                    <input type="number" id="fDoorGapMid" value="2" oninput="drawPreview()">
+                </div>
+                <div style="flex:1;">
+                    <label style="color:#d35400;">扉 下すきま</label>
+                    <input type="number" id="fDoorGapB" value="2" oninput="drawPreview()">
+                </div>
+                <div style="flex:1;">
+                    <label style="color:#d35400;">扉厚み</label>
+                    <input type="number" id="fDoorT" value="20" oninput="drawPreview()">
+                </div>
+            </div>
+            
+            <div style="display:flex; flex-direction:column; gap:5px; margin-top:5px; padding: 5px; background: #fff; border: 1px solid #d35400; border-radius: 4px;">
+                <div style="display:flex; gap:5px; align-items:center;">
+                    <div style="flex:0.5; text-align:center;">
+                        <label style="color:#d35400;">引手</label>
+                        <input type="checkbox" id="fHikiteUse" checked onchange="onHikiteTypeChange()">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="color:#d35400;">種類</label>
+                        <select id="fHikiteType" onchange="onHikiteTypeChange()" style="padding:4px 2px;">
+                            <option value="normal" selected>面付/掘込</option>
+                            <option value="top_edge">上端手掛(テーパ)</option>
+                        </select>
+                    </div>
+                    <div style="flex:1.2;" class="hikite-normal-only">
+                        <label style="color:#d35400;" title="扉の一番上から引手センターまでの距離">上端下がり</label>
+                        <input type="number" id="fHikiteH" value="100" oninput="drawPreview()">
+                    </div>
+                    <div style="flex:1;" class="hikite-normal-only">
+                        <label style="color:#d35400;">端からアキ</label>
+                        <input type="number" id="fHikiteEdge" value="40" oninput="drawPreview()">
+                    </div>
+                </div>
+                <div style="display:flex; gap:5px; align-items:center;" class="hikite-normal-only">
+                    <div style="flex:0.5; text-align:center;">
+                        <label style="color:#d35400; font-size:10px;">寸法表示</label>
+                        <input type="checkbox" id="fHikiteDimUse" checked onchange="drawPreview()">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="color:#d35400;">引手 幅 (W)</label>
+                        <input type="number" id="fHikiteW" value="30" oninput="drawPreview()">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="color:#d35400;">引手 縦 (H)</label>
+                        <input type="number" id="fHikiteL" value="110" oninput="drawPreview()">
+                    </div>
+                    <div style="flex:1.5;">
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+
+        <div class="action-buttons">
+            <button class="btn-main btn-orange" onclick="resetViewAndPrint()">A3印刷 / PDF保存</button>
+            <button class="btn-main btn-dark" onclick="exportDXF()">DXF出力</button>
+        </div>
+    </div>
+
+    <div class="preview-area">
+        <div class="canvas-wrapper">
+            <canvas id="previewCanvas" width="1587" height="1123"></canvas>
+        </div>
+        <div class="slider-v"><input type="range" id="slideY" min="-1000" max="1000" value="0" step="10" oninput="syncInput('Y')"></div>
+        <div class="slider-h"><input type="range" id="slideX" min="-1000" max="1000" value="0" step="10" oninput="syncInput('X')"></div>
+    </div>
+</div>
+
+<script>
+let ctx = null; let _isDXF = false; let _dxfStr = ""; let _dxfFactor = 1.0; const canvasHeight = 1123; 
+let viewZoom = 1.0; let viewOffsetX = 0; let viewOffsetY = 0;
+let lastScale = 1;
+
+let dimOffsets = {};
+let dimHitboxes = [];
+let draggingDim = null;
+
+let eraserHistory = [];
+let deletedShelves = new Set(); 
+let deletedDims = new Set();
+let isEraserMode = false;
+
+let textHitboxes = [];
+let dragTargetText = null;
+let dragTargetArrow = null;
+
+let shelfHitboxes = []; 
+let draggingShelf = null; 
+
+let doorEdgeHitboxes = [];
+let draggingDoorEdge = null; 
+
+let vPanelHitboxes = [];
+let draggingVPanel = null;
+
+// ★ 全角数字や全角カンマを半角に変換し、配列にするヘルパー関数 ★
+function parseNumList(str) {
+    if(!str) return [];
+    let s = str.replace(/[、，]/g, ',').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+    return s.split(',').map(v => v.trim());
+}
+
+function onHikiteTypeChange() {
+    updateHikiteUI();
+    const useHikite = document.getElementById('fHikiteUse').checked;
+    const hType = document.getElementById('fHikiteType').value;
+    const gapT = document.getElementById('fDoorGapT');
+    const gapMid = document.getElementById('fDoorGapMid');
+    
+    if (useHikite && hType === 'top_edge') {
+        if (gapT) gapT.value = 20;
+        if (gapMid) gapMid.value = 20;
+    } else if (useHikite && hType === 'normal') {
+        if (gapT && gapT.value == 20) gapT.value = 2;
+        if (gapMid && gapMid.value == 20) gapMid.value = 2;
+    }
+    drawPreview();
+}
+
+function updateHikiteUI() {
+    const elType = document.getElementById('fHikiteType');
+    const elUse = document.getElementById('fHikiteUse');
+    if (!elType || !elUse) return;
+    const hType = elType.value;
+    const useHikite = elUse.checked;
+    const els = document.querySelectorAll('.hikite-normal-only');
+    els.forEach(el => {
+        el.style.opacity = (useHikite && hType === 'normal') ? '1' : '0.4';
+        el.style.pointerEvents = (useHikite && hType === 'normal') ? 'auto' : 'none';
+    });
+}
+
+function addTextRow(txt="テキスト", x=500, y=500, angle=0, useA=false, ax=600, ay=600) {
+    const div = document.createElement('div');
+    div.className = 'text-row'; 
+    div.style.display = "flex";
+    div.style.gap = "5px";
+    div.style.marginBottom = "4px";
+    
+    div.innerHTML = `
+        <input type="text" class="extra-txt" value="${txt}" placeholder="内容" oninput="drawPreview()" style="flex:1;">
+        <button type="button" class="btn-scale extra-rot" data-angle="${angle}" onclick="rotateText(this)" style="width:40px; padding:0;">${angle}°</button>
+        <label style="font-size:10px; display:flex; align-items:center; gap:2px;"><input type="checkbox" class="extra-use-arrow" ${useA?'checked':''} onchange="drawPreview()">矢</label>
+        
+        <input type="hidden" class="extra-x" value="${x}">
+        <input type="hidden" class="extra-y" value="${y}">
+        <input type="hidden" class="extra-ax" value="${ax}">
+        <input type="hidden" class="extra-ay" value="${ay}">
+        
+        <button class="btn-copy" onclick="duplicateTextRow(this)">コピー</button>
+        <button class="btn-del" onclick="removeRow(this)">×</button>
+    `;
+    document.getElementById('extraTextContainer').appendChild(div);
+    drawPreview();
+}
+
+function duplicateTextRow(btn) {
+    const row = btn.parentElement;
+    const txt = row.querySelector('.extra-txt').value;
+    const x = parseFloat(row.querySelector('.extra-x').value) + 100;
+    const y = parseFloat(row.querySelector('.extra-y').value) - 100;
+    const angle = parseInt(row.querySelector('.extra-rot').dataset.angle);
+    const useA = row.querySelector('.extra-use-arrow').checked;
+    const ax = parseFloat(row.querySelector('.extra-ax').value) + 100;
+    const ay = parseFloat(row.querySelector('.extra-ay').value) - 100;
+    
+    addTextRow(txt, x, y, angle, useA, ax, ay);
+}
+
+function rotateText(btn) {
+    let a = parseInt(btn.dataset.angle);
+    a = (a + 90) % 360;
+    btn.dataset.angle = a;
+    btn.innerText = a + "°";
+    drawPreview();
+}
+
+function toggleEraser() {
+    isEraserMode = !isEraserMode;
+    const btn = document.getElementById('eraserModeBtn');
+    if (isEraserMode) {
+        btn.style.background = "#c0392b";
+        btn.innerText = "消しゴム (ON)";
+        document.getElementById('previewCanvas').style.cursor = 'crosshair';
+    } else {
+        btn.style.background = "#34495e";
+        btn.innerText = "消しゴム (OFF)";
+        document.getElementById('previewCanvas').style.cursor = 'grab';
+    }
+}
+
+function undoEraser() {
+    if (eraserHistory.length > 0) {
+        let last = eraserHistory.pop();
+        if (last.type === 'dim') {
+            deletedDims.delete(last.id);
+        } else if (last.type === 'shelf') {
+            deletedShelves.delete(last.id);
+        } else if (last.type === 'text') {
+            last.row.style.display = 'flex'; 
+        }
+        drawPreview();
+    }
+}
+
+function setScale(val) { document.getElementById('scaleStr').value = val; drawPreview(); }
+
+function addRow(l="", v="") {
+    const div = document.createElement('div'); div.className = 'spec-row';
+    div.innerHTML = `<input type="text" class="spec-label" value="${l}" oninput="drawPreview()"><input type="text" class="spec-value" value="${v}" oninput="drawPreview()"><button class="btn-del" onclick="removeRow(this)">×</button>`;
+    document.getElementById('specContainer').appendChild(div); drawPreview();
+}
+function removeRow(btn) { btn.parentElement.remove(); drawPreview(); }
+
+function outLine(x1, y1, x2, y2, lw=0.6, color="#000", dash=[]) {
+    if(!_isDXF) { 
+        ctx.beginPath(); ctx.setLineDash(dash); ctx.strokeStyle = color; ctx.lineWidth = lw; 
+        ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.setLineDash([]); 
+    } else { 
+        let layer = dash.length > 0 ? "DASHED" : "0";
+        _dxfStr += `  0\r\nLINE\r\n  8\r\n${layer}\r\n 10\r\n${(x1*_dxfFactor).toFixed(2)}\r\n 20\r\n${((canvasHeight-y1)*_dxfFactor).toFixed(2)}\r\n 11\r\n${(x2*_dxfFactor).toFixed(2)}\r\n 21\r\n${((canvasHeight-y2)*_dxfFactor).toFixed(2)}\r\n`; 
+    }
+}
+function outRect(x, y, w, h, lw=1.0, color="#000") { outLine(x, y, x+w, y, lw, color); outLine(x+w, y, x+w, y+h, lw, color); outLine(x+w, y+h, x, y+h, lw, color); outLine(x, y+h, x, y, lw, color); }
+function outText(txt, cx, cy, size, angle=0, color="#000", align="center") {
+    if(!_isDXF) {
+        ctx.fillStyle = color; ctx.font = `bold ${size}px sans-serif`; ctx.textAlign = align; ctx.textBaseline = "middle";
+        if(angle !== 0) { ctx.save(); ctx.translate(cx, cy); ctx.rotate(angle * Math.PI / 180); ctx.fillText(txt, 0, 0); ctx.restore(); } else ctx.fillText(txt, cx, cy);
+    }
+}
+function outCircle(cx, cy, r, lw=1.0, color="#000", isFill=false) {
+    if(!_isDXF) { ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.arc(cx, cy, r, 0, Math.PI * 2); if(isFill) { ctx.fillStyle = color; ctx.fill(); } else { ctx.stroke(); } }
+}
+
+function drawDim(scale, originX, originY, x1_mm, y1_mm, x2_mm, y2_mm, default_offset_mm, text, isVert = false, textShiftX = 0, dimId = null) {
+    if (dimId && deletedDims.has(dimId)) return;
+    let offset_mm = (dimId && dimOffsets[dimId] !== undefined) ? dimOffsets[dimId] : default_offset_mm;
+    const orig_x1 = originX + x1_mm * scale; const orig_y1 = originY - y1_mm * scale;
+    const orig_x2 = originX + x2_mm * scale; const orig_y2 = originY - y2_mm * scale;
+    const dir = Math.sign(offset_mm) || 1;
+    const gapS = 100 * scale; 
+    const dotR = 1.5; 
+    let ay, ax;
+    
+    if(!isVert) {
+        ay = orig_y1 - offset_mm * scale;
+        outLine(orig_x1, orig_y1 - gapS*dir, orig_x1, ay - 5*dir, 0.4); outLine(orig_x2, orig_y2 - gapS*dir, orig_x2, ay - 5*dir, 0.4);
+        outLine(orig_x1, ay, orig_x2, ay, 0.4); outCircle(orig_x1, ay, dotR, 1, "#000", true); outCircle(orig_x2, ay, dotR, 1, "#000", true);
+        outText(text, ((orig_x1 + orig_x2) / 2) + textShiftX, ay - 10*dir, 14); 
+    } else {
+        ax = orig_x1 - offset_mm * scale;
+        outLine(orig_x1 - gapS*dir, orig_y1, ax - 5*dir, orig_y1, 0.4); outLine(orig_x2 - gapS*dir, orig_y2, ax - 5*dir, orig_y2, 0.4);
+        outLine(ax, orig_y1, ax, orig_y2, 0.4); outCircle(ax, orig_y1, dotR, 1, "#000", true); outCircle(ax, orig_y2, dotR, 1, "#000", true);
+        outText(text, ax - 10*dir + textShiftX, (orig_y1 + orig_y2) / 2, 14, 90); 
+    }
+    if (dimId && !_isDXF) {
+        dimHitboxes.push({ id: dimId, isVert: isVert, x1: isVert ? ax : Math.min(orig_x1, orig_x2), x2: isVert ? ax : Math.max(orig_x1, orig_x2), y1: isVert ? Math.min(orig_y1, orig_y2) : ay, y2: isVert ? Math.max(orig_y1, orig_y2) : ay, defaultOffset: default_offset_mm });
+    }
+}
+
+function drawHatching(x, y, w, h, scale) {
+    if(_isDXF) return; const step = 8 * scale; ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    ctx.strokeStyle = "#7f8fa6"; ctx.lineWidth = 0.5; 
+    for (let i = -h; i < w + h; i += step) { ctx.moveTo(x + i, y + h); ctx.lineTo(x + i + h, y); } ctx.stroke(); ctx.restore();
+}
+
+function getVal(id, def) { const el = document.getElementById(id); return (el && el.value !== "") ? parseFloat(el.value) : def; }
+
+function drawExtraTexts(oX, oY, scale) {
+    textHitboxes = [];
+    const rows = document.querySelectorAll('#extraTextContainer .text-row');
+    rows.forEach((row, i) => {
+        if (row.style.display === 'none') return; 
+        const txt = row.querySelector('.extra-txt').value; if(!txt) return;
+        const x = parseFloat(row.querySelector('.extra-x').value);
+        const y = parseFloat(row.querySelector('.extra-y').value);
+        const angle = parseInt(row.querySelector('.extra-rot').dataset.angle);
+        const useA = row.querySelector('.extra-use-arrow').checked;
+        const ax = parseFloat(row.querySelector('.extra-ax').value);
+        const ay = parseFloat(row.querySelector('.extra-ay').value);
+
+        const cx = oX + x*scale; const cy = oY - y*scale;
+
+        if (useA) {
+            const tipX = oX + ax*scale; const tipY = oY - ay*scale;
+            if(!_isDXF) {
+                ctx.beginPath(); ctx.strokeStyle = "#e74c3c"; ctx.lineWidth = 1.0;
+                ctx.moveTo(cx, cy); ctx.lineTo(tipX, tipY); ctx.stroke();
+                const angleLine = Math.atan2(tipY - cy, tipX - cx); const hL = 10;
+                ctx.beginPath(); ctx.moveTo(tipX, tipY);
+                ctx.lineTo(tipX - hL * Math.cos(angleLine - Math.PI/6), tipY - hL * Math.sin(angleLine - Math.PI/6));
+                ctx.moveTo(tipX, tipY);
+                ctx.lineTo(tipX - hL * Math.cos(angleLine + Math.PI/6), tipY - hL * Math.sin(angleLine + Math.PI/6));
+                ctx.stroke();
+                textHitboxes.push({ isArrow: true, row: row, x1: tipX - 15, x2: tipX + 15, y1: tipY - 15, y2: tipY + 15 });
+            } else {
+                outLine(x, y, ax, ay, 1.0, "#e74c3c");
+            }
+        }
+        outText(txt, cx, cy, 14, -angle, useA ? "#e74c3c" : "#000");
+        if(!_isDXF) {
+            ctx.font = "bold 14px sans-serif"; const tw = ctx.measureText(txt).width;
+            textHitboxes.push({ isArrow: false, row: row, x1: cx - tw/2 - 10, x2: cx + tw/2 + 10, y1: cy - 15, y2: cy + 15 });
+        }
+    });
+}
+
+function generateDrawing() {
+    dimHitboxes = []; shelfHitboxes = []; doorEdgeHitboxes = []; vPanelHitboxes = [];
+    
+    let vsp = document.getElementById('fDoorVSplit') ? document.getElementById('fDoorVSplit').value : '1';
+    if(document.getElementById('wrapDoorMid')) document.getElementById('wrapDoorMid').style.display = (vsp === '3') ? 'block' : 'none';
+    if(document.getElementById('wrapDoorBot')) document.getElementById('wrapDoorBot').style.display = (vsp === '2' || vsp === '3') ? 'block' : 'none';
+    if(document.getElementById('wrapGapMid')) document.getElementById('wrapGapMid').style.display = (vsp !== '1') ? 'block' : 'none';
+    if(document.getElementById('labelDoorTop')) document.getElementById('labelDoorTop').innerText = (vsp === '1') ? '上段 (枚数 / 吊り元)' : '扉設定 (枚数 / 吊り元)';
+
+    const canvas = document.getElementById('previewCanvas'); const cw = canvas.width, ch = canvas.height;
+    if(!_isDXF) { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cw, ch); ctx.translate(viewOffsetX, viewOffsetY); ctx.scale(viewZoom, viewZoom); }
+    
+    const v = { 
+        compName: document.getElementById('compName').value, 
+        pjName: document.getElementById('pjName').value,
+        dwgName: document.getElementById('dwgName').value,
+        scaleStr: document.getElementById('scaleStr').value, 
+        dateStr: document.getElementById('dateStr').value,
+        managerStr: document.getElementById('managerStr').value,
+        dwgNoStr: document.getElementById('dwgNoStr').value,
+        W: getVal('w', 1800), 
+        H: getVal('h', 850), 
+        D: getVal('d', 450), 
+        offX: getVal('offX', 0), 
+        offY: getVal('offY', 0),
+        specLabels: Array.from(document.querySelectorAll('.spec-label')).map(el => el.value), 
+        specValues: Array.from(document.querySelectorAll('.spec-value')).map(el => el.value), 
+        specNote: document.getElementById('specNote') ? document.getElementById('specNote').value : ""
+    };
+
+    const doorType = document.getElementById('doorType').value;
+    document.getElementById('furnitureGroup').style.display = (doorType === 'furniture') ? 'block' : 'none';
+    if(document.getElementById('doorGroup')) document.getElementById('doorGroup').style.display = (doorType === 'furniture') ? 'block' : 'none';
+    
+    let S_den = 20; let match = v.scaleStr.match(/(\d+)\s*[\/:]\s*(\d+)/); if(match) S_den = parseFloat(match[2]) / parseFloat(match[1]);
+    let scale = _isDXF ? 1.0 : (3.779527 / S_den); lastScale = scale;
+    const oX = (cw/2) - (v.W*scale)/2 + (v.offX*scale) - 300*scale; const oY = (ch/2) + (v.H*scale)/2 - 50 + (v.offY*scale);
+    
+    /* --- 図面枠と表題欄 --- */
+    const borderOffset = 25; 
+    outRect(borderOffset, borderOffset, cw - borderOffset*2, ch - borderOffset*2, 1.0); 
+    const ty = ch - borderOffset - 45; 
+    outLine(borderOffset, ty, cw - borderOffset, ty, 1.0);
+    
+    const rX = cw - borderOffset;
+    outLine(rX - 860, ty, rX - 860, ch - borderOffset, 1.0); outLine(rX - 540, ty, rX - 540, ch - borderOffset, 1.0);
+    outLine(rX - 340, ty, rX - 340, ch - borderOffset, 1.0); outLine(rX - 280, ty, rX - 280, ch - borderOffset, 1.0);
+    outLine(rX - 170, ty, rX - 170, ch - borderOffset, 1.0); outLine(rX - 85, ty, rX - 85, ch - borderOffset, 1.0); 
+
+    const midY = ty + 22.5; 
+    outText(v.compName, borderOffset + 110, midY, 14); 
+    outText(v.pjName, rX - 845, midY, 12, 0, "#000", "left"); 
+    outText(v.dwgName, rX - 525, midY, 12, 0, "#000", "left");
+    outText(v.scaleStr, rX - 310, midY, 11); 
+    outText(v.dateStr, rX - 265, midY, 11, 0, "#000", "left"); 
+    outText(v.managerStr, rX - 127, midY, 11); 
+    outText(v.dwgNoStr, rX - 42, midY, 12);
+
+    if (doorType === 'furniture') drawFurniture(oX, oY, scale, v);
+    else outRect(oX, oY - v.H*scale, v.W*scale, v.H*scale, 1.0);
+
+    /* --- 仕上・金物リスト表 --- */
+    const sX_spec = cw - borderOffset - 420; const sY_spec = borderOffset; const tW = 420; const colW = 80; const headerH = 28; const rowH = 22;
+    const totalSpecH = headerH + (v.specLabels.length * rowH) + 28;
+    outRect(sX_spec, sY_spec, tW, totalSpecH, 0.5); outLine(sX_spec, sY_spec + headerH, sX_spec + tW, sY_spec + headerH, 0.5);
+    outLine(sX_spec + colW, sY_spec, sX_spec + colW, sY_spec + headerH + (v.specLabels.length * rowH), 0.5);
+    for(let i=1; i<=v.specLabels.length; i++) outLine(sX_spec, sY_spec + headerH + i*rowH, sX_spec + tW, sY_spec + headerH + i*rowH, 0.5);
+    outText("名称", sX_spec + colW/2, sY_spec + headerH/2, 13); outText("仕上 ・ 金物", sX_spec + colW + (tW-colW)/2, sY_spec + headerH/2, 13);
+    v.specLabels.forEach((l, i) => { 
+        outText(l, sX_spec+colW/2, sY_spec+headerH+i*rowH+rowH/2, 12); 
+        outText(v.specValues[i], sX_spec+colW+10, sY_spec+headerH+i*rowH+rowH/2, 12, 0, "#000", "left"); 
+    });
+    
+    const specNoteY = sY_spec + headerH + v.specLabels.length * rowH + 14;
+    outText(v.specNote, sX_spec+10, specNoteY, 12, 0, "#c0392b", "left");
+
+    drawExtraTexts(oX, oY, scale);
+
+    if(!_isDXF) ctx.restore();
+}
+
+function drawFurniture(oX, oY, scale, v) {
+    const isPlinthOn = document.getElementById('fPlinthToggle') ? document.getElementById('fPlinthToggle').checked : true;
+    const fSide = getVal('fSideT', 20), fTop = getVal('fTopT', 20), fBot = getVal('fBotT', 20), fPlinth = isPlinthOn ? getVal('fPlinthH', 60) : 0, fShelfT = getVal('fShelfT', 20), fVCount = getVal('fVCount', 2), fVThick = getVal('fVThick', 20);
+    const isBackOn = document.getElementById('fBackToggle') ? document.getElementById('fBackToggle').checked : true;
+    const fBackOff = getVal('fBackOff', 12), fBackT = getVal('fBackT', 3), fBackIns = getVal('fBackIns', 6);
+    const useH = document.getElementById('fHUse').checked, useV = document.getElementById('fVUse').checked, tenGachi = document.getElementById('fTenGachi').checked, chiGachi = document.getElementById('fChiGachi').checked, usePillar = document.getElementById('fUsePillar').checked, useDowel = document.getElementById('fUseDowel').checked;
+    const fPlanOff = getVal('fPlanOff', 500), fSecOff = getVal('fSecOff', 300);
+    const isWinH = document.getElementById('fWinH').checked; 
+    const useDash = document.getElementById('fUseDash') ? document.getElementById('fUseDash').checked : false; 
+    const useMakuita = document.getElementById('fMakuitaUse') ? document.getElementById('fMakuitaUse').checked : false;
+    const fMakuitaH = getVal('fMakuitaH', 100);
+
+    const isDoorOn = document.getElementById('fDoorToggle') ? document.getElementById('fDoorToggle').checked : true;
+    const fDoorT = getVal('fDoorT', 20);
+    
+    // ★ 固定棚の横勝ちトグル ★
+    const fFixedWin = document.getElementById('fFixedWin') ? document.getElementById('fFixedWin').checked : true;
+    
+    const fVExtend = getVal('fVExtend', 0);
+    const fFixedExtend = getVal('fFixedExtend', 0);
+    
+    /* 🌟引手設定の取得🌟 */
+    const useHikite = document.getElementById('fHikiteUse') ? document.getElementById('fHikiteUse').checked : false;
+    const hType = document.getElementById('fHikiteType') ? document.getElementById('fHikiteType').value : 'normal';
+    const useHikiteDim = document.getElementById('fHikiteDimUse') ? document.getElementById('fHikiteDimUse').checked : true;
+    const hH = getVal('fHikiteH', 100);
+    const hEdge = getVal('fHikiteEdge', 40);
+    const hW = getVal('fHikiteW', 30);
+    const hL = getVal('fHikiteL', 110);
+    
+    /* 🌟🌟 納まり設定と判定 🌟🌟 */
+    const fDoorOverlay = document.getElementById('fDoorOverlay') ? document.getElementById('fDoorOverlay').value : 'inset';
+    const isSliding = fDoorOverlay === 'sliding';
+    const isParting = fDoorOverlay === 'parting'; 
+    const isInsetType = (fDoorOverlay === 'inset' || isSliding || isParting);
+    
+    let bodyD = (isDoorOn && !isInsetType) ? v.D - fDoorT : v.D;
+    let gap = 4; // 引き戸のレール間のすきま
+
+    const rectF = (x, y, w, h, lw=0.6) => { outRect(oX + x*scale, oY - (y+h)*scale, w*scale, h*scale, lw); };
+    const lineF = (x, y, x2, y2, lw=0.6, dash=[]) => { outLine(oX + x*scale, oY - y*scale, oX + x2*scale, oY - y2*scale, lw, "#000", dash); };
+
+    const dashRectF = (x, y, w, h, lw=0.5) => {
+        if(!_isDXF) { ctx.save(); ctx.beginPath(); ctx.setLineDash([3, 3]); ctx.strokeStyle = "#95a5a6"; ctx.lineWidth = lw; ctx.rect(oX + x*scale, oY - (y+h)*scale, w*scale, h*scale); ctx.stroke(); ctx.restore(); }
+    };
+    const dashRectSec = (x, y, w, h, lw=0.5) => {
+        if(!_isDXF) { ctx.save(); ctx.beginPath(); ctx.setLineDash([3, 3]); ctx.strokeStyle = "#95a5a6"; ctx.lineWidth = lw; ctx.rect(secX + x*scale, oY - (y+h)*scale, w*scale, h*scale); ctx.stroke(); ctx.restore(); }
+    };
+
+    // 🌟 家具の扉装飾描画用ヘルパー 🌟
+    const drawDoorDecoration = (doorX, doorY, doorW, doorH, doorIndex = 0, isDrawDim = false) => {
+        const style = document.getElementById('fDoorStyle') ? document.getElementById('fDoorStyle').value : 'flash';
+        if (style === 'flash') return;
+
+        const kV = getVal('fKamachiV', 60);
+        const kTop = getVal('fKamachiTop', 60);
+        const kBot = getVal('fKamachiBot', 60);
+        const nCount = getVal('fNakazanCount', 0);
+        const nW = getVal('fNakazanW', 60);
+
+        const innerX = doorX + kV;
+        const innerY = doorY + kBot;
+        const innerW = doorW - kV * 2;
+        const innerH = doorH - kBot - kTop;
+
+        if (innerW > 0 && innerH > 0) {
+            rectF(innerX, innerY, innerW, innerH, 0.5); // 内枠
+
+            // 縦勝ち（縦框が上下に突き抜ける）表現の境界線
+            lineF(innerX, doorY, innerX, innerY, 0.5); // 左下
+            lineF(innerX + innerW, doorY, innerX + innerW, innerY, 0.5); // 右下
+            lineF(innerX, innerY + innerH, innerX, doorY + doorH, 0.5); // 左上
+            lineF(innerX + innerW, innerY + innerH, innerX + innerW, doorY + doorH, 0.5); // 右上
+
+            if (nCount > 0) {
+                const totalNakazanH = nCount * nW;
+                const panelH = (innerH - totalNakazanH) / (nCount + 1);
+                for (let i = 0; i < nCount; i++) {
+                    let ny = innerY + panelH + (panelH + nW) * i;
+                    rectF(innerX, ny, innerW, nW, 0.5);
+                }
+            }
+
+            if (style === 'glass') {
+                let pCount = nCount + 1;
+                let pH = (innerH - nCount * nW) / pCount;
+                for(let i=0; i<pCount; i++) {
+                    let py = innerY + i * (pH + nW);
+                    let cx = innerX + innerW/2; let cy = py + pH/2;
+                    let l = Math.min(innerW, pH) * 0.25;
+                    
+                    if (!_isDXF) {
+                        ctx.save(); ctx.beginPath(); ctx.strokeStyle = "#85c1e9"; ctx.lineWidth = 1; ctx.globalAlpha = 0.5;
+                        ctx.moveTo(oX + (cx-l)*scale, oY - (cy-l)*scale); ctx.lineTo(oX + (cx+l)*scale, oY - (cy+l)*scale);
+                        ctx.moveTo(oX + (cx-l+15)*scale, oY - (cy-l)*scale); ctx.lineTo(oX + (cx+l+15)*scale, oY - (cy+l)*scale);
+                        ctx.stroke(); ctx.restore();
+                    } else {
+                        lineF(cx-l, cy-l, cx+l, cy+l, 0.5);
+                        lineF(cx-l+15, cy-l, cx+l+15, cy+l, 0.5);
+                    }
+                }
+            }
+
+            if (style === 'garari') {
+                let pCount = nCount + 1;
+                let pH = (innerH - nCount * nW) / pCount;
+                let pitch = 30; 
+                for(let i=0; i<pCount; i++) {
+                    let py = innerY + i * (pH + nW);
+                    let lCount = Math.floor(pH / pitch);
+                    for(let j=1; j<=lCount; j++) {
+                        let gy = py + j * pitch;
+                        if (gy < py + pH) {
+                            lineF(innerX, gy, innerX + innerW, gy, 0.3);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // ★框(見付)の寸法線描画★
+        if (isDrawDim && style !== 'flash') {
+            // 左縦框
+            drawDim(scale, oX, oY, doorX, doorY + doorH/2, doorX + kV, doorY + doorH/2, -40, kV.toString(), false, 0, 'dim_kamachi_v_l_' + doorIndex);
+            // 右縦框
+            drawDim(scale, oX, oY, doorX + doorW - kV, doorY + doorH/2, doorX + doorW, doorY + doorH/2, -40, kV.toString(), false, 0, 'dim_kamachi_v_r_' + doorIndex);
+            // 上桟
+            drawDim(scale, oX, oY, doorX + doorW/2, doorY + doorH - kTop, doorX + doorW/2, doorY + doorH, 40, kTop.toString(), true, 0, 'dim_kamachi_top_' + doorIndex);
+            // 下桟
+            drawDim(scale, oX, oY, doorX + doorW/2, doorY, doorX + doorW/2, doorY + kBot, 40, kBot.toString(), true, 0, 'dim_kamachi_bot_' + doorIndex);
+        }
+    };
+
+    rectF(0, 0, v.W, v.H, 1.0);
+    lineF(0, fPlinth, v.W, fPlinth, 0.8);
+    if(tenGachi) lineF(0, v.H-fTop, v.W, v.H-fTop); else lineF(fSide, v.H-fTop, v.W-fSide, v.H-fTop);
+    if(chiGachi) lineF(0, fPlinth+fBot, v.W, fPlinth+fBot); else lineF(fSide, fPlinth+fBot, v.W-fSide, fPlinth+fBot);
+    const sTY = tenGachi ? v.H-fTop : v.H; const sBY = chiGachi ? fPlinth+fBot : fPlinth;
+    lineF(fSide, sBY, fSide, sTY); lineF(v.W-fSide, sBY, v.W-fSide, sTY);
+
+    if (useMakuita) { rectF(0, v.H, v.W, fMakuitaH, 1.0); }
+
+    const innerW = v.W - 2 * fSide; 
+    let computedSpans = [];
+    if (!useV || fVCount <= 0) {
+        computedSpans = [innerW];
+    } else {
+        let numSpans = fVCount + 1;
+        let spanWidths = Array(numSpans).fill('auto');
+        let customSpansStr = document.getElementById('fVSpans').value;
+        if (customSpansStr) {
+            let parts = parseNumList(customSpansStr);
+            for(let i=0; i<Math.min(parts.length, numSpans); i++) { if (parts[i] !== '') spanWidths[i] = parts[i]; }
+        }
+        let fixedTotal = 0; let autoCount = 0;
+        for(let i=0; i<numSpans; i++) {
+            if (spanWidths[i].toString().toLowerCase() === 'auto') autoCount++;
+            else {
+                let val = parseFloat(spanWidths[i]);
+                if (!isNaN(val)) fixedTotal += val; else { spanWidths[i] = 'auto'; autoCount++; }
+            }
+        }
+        let availableW = innerW - fVCount * fVThick - fixedTotal;
+        let autoW = autoCount > 0 ? Math.max(0, availableW / autoCount) : 0;
+        for(let i=0; i<numSpans; i++) { computedSpans.push(spanWidths[i] === 'auto' ? autoW : parseFloat(spanWidths[i])); }
+    }
+
+    let vXs = []; let curX = fSide;
+    let spanStarts = [fSide];
+    if (useV && fVCount > 0) {
+        for(let i=0; i<fVCount; i++) {
+            curX += computedSpans[i];
+            vXs.push(curX);
+            curX += fVThick;
+            spanStarts.push(curX);
+        }
+    }
+
+    if (useV && fVCount > 0) {
+        vXs.forEach((vx, i) => {
+            if (!_isDXF) {
+                vPanelHitboxes.push({ id: `vpanel_${i}`, index: i, x1: oX + vx*scale, x2: oX + (vx+fVThick)*scale, y1: oY - (v.H-fTop)*scale, y2: oY - (fPlinth+fBot)*scale });
+            }
+        });
+    }
+
+    let allShelves = [];
+    let fFixedStr = document.getElementById('fFixedHeights').value;
+    let fixedArr = parseNumList(fFixedStr).filter(s => s !== "");
+    let fFixedT = getVal('fFixedT', 20);
+    let fixedVals = fixedArr.map(valStr => parseFloat(valStr)).filter(val => !isNaN(val));
+    fixedVals.sort((a, b) => a - b); 
+    
+    fixedVals.forEach((val, i) => {
+        let sy = fPlinth + fBot + val;
+        // ★固定棚に一意のIDを付与
+        allShelves.push({ type: 'fixed', y: sy, h: fFixedT, index: i, val: val, id: `fixed_${i}` });
+    });
+
+    if (useH) {
+        let hCountArr = parseNumList(document.getElementById('fHCount').value).map(s => parseInt(s)).filter(n => !isNaN(n));
+        if (hCountArr.length === 0) hCountArr = [0];
+        let startY = fPlinth + fBot;
+        let endY; let movableIndex = 1;
+
+        for (let i = 0; i <= fixedVals.length; i++) {
+            endY = (i < fixedVals.length) ? (fPlinth + fBot + fixedVals[i]) : (v.H - fTop); 
+            let sectionH = endY - startY;
+            let topDownIndex = fixedVals.length - i; 
+            let count = hCountArr[Math.min(topDownIndex, hCountArr.length - 1)]; 
+            
+            if (count > 0 && sectionH > 0) {
+                let spanH = (sectionH - count * fShelfT) / (count + 1);
+                for (let j = 1; j <= count; j++) {
+                    let sy = startY + j * spanH + (j - 1) * fShelfT;
+                    allShelves.push({ type: 'movable', y: sy, h: fShelfT, id: `movable_${movableIndex}` });
+                    movableIndex++;
+                }
+            }
+            if (i < fixedVals.length) startY = fPlinth + fBot + fixedVals[i] + fFixedT; 
+        }
+    }
+
+    let dimDrawnForHeight = {}; 
+    allShelves.forEach(shelf => {
+        // ★固定棚が中立を貫通するかどうかを判定
+        let isThisShelfWin = shelf.type === 'fixed' ? fFixedWin : isWinH; 
+
+        if (isThisShelfWin) {
+            let shelfId = shelf.type === 'fixed' ? `fixed_${shelf.index}_all` : shelf.id;
+            if (deletedShelves.has(shelfId)) return; 
+            let isDraggingThis = (draggingShelf && draggingShelf.id === shelfId);
+            
+            if (isDraggingThis) {
+                let dx = draggingShelf.currentMouseX - draggingShelf.mouseStartX; let dy = draggingShelf.currentMouseY - draggingShelf.mouseStartY;
+                ctx.save(); ctx.globalAlpha = 0.5; ctx.fillStyle = "#e74c3c";
+                let rawX = oX + fSide*scale + dx; let rawY = oY - (shelf.y + shelf.h)*scale + dy;
+                ctx.fillRect(rawX, rawY, innerW * scale, shelf.h * scale);
+                ctx.strokeStyle = "#c0392b"; ctx.strokeRect(rawX, rawY, innerW * scale, shelf.h * scale); ctx.restore();
+            } else {
+                rectF(fSide, shelf.y, innerW, shelf.h, 0.5);
+                if (shelf.type === 'movable' && useDash) { dashRectF(fSide, shelf.y + 40, innerW, shelf.h); }
+                if (shelf.type === 'fixed' && !_isDXF) {
+                    shelfHitboxes.push({ id: shelfId, index: shelf.index, x1: oX + fSide*scale, x2: oX + (fSide + innerW)*scale, y1: oY - (shelf.y + shelf.h)*scale, y2: oY - shelf.y*scale });
+                }
+            }
+        } else {
+            // ★中立に分割される場合
+            for (let k = 0; k <= (useV ? fVCount : 0); k++) {
+                let sx = spanStarts[k];
+                let cSpanW = computedSpans[k];
+                let shelfId = `${shelf.id}_${k}`; 
+                if (deletedShelves.has(shelfId)) continue; 
+
+                let isDraggingThis = (draggingShelf && draggingShelf.id === shelfId);
+                if (isDraggingThis) {
+                    let dx = draggingShelf.currentMouseX - draggingShelf.mouseStartX; let dy = draggingShelf.currentMouseY - draggingShelf.mouseStartY;
+                    ctx.save(); ctx.globalAlpha = 0.5; ctx.fillStyle = "#e74c3c";
+                    let rawX = oX + sx*scale + dx; let rawY = oY - (shelf.y + shelf.h)*scale + dy;
+                    ctx.fillRect(rawX, rawY, cSpanW * scale, shelf.h * scale);
+                    ctx.strokeStyle = "#c0392b"; ctx.strokeRect(rawX, rawY, cSpanW * scale, shelf.h * scale); ctx.restore();
+                } else {
+                    rectF(sx, shelf.y, cSpanW, shelf.h, 0.5);
+                    if (shelf.type === 'movable' && useDash) { dashRectF(sx, shelf.y + 40, cSpanW, shelf.h); }
+                    if (shelf.type === 'fixed' && !_isDXF) {
+                        shelfHitboxes.push({ id: shelfId, index: shelf.index, x1: oX + sx*scale, x2: oX + (sx + cSpanW)*scale, y1: oY - (shelf.y + shelf.h)*scale, y2: oY - shelf.y*scale });
+                    }
+                }
+            }
+        }
+    });
+
+    if (useV && fVCount > 0) {
+        let allY = [];
+        allShelves.forEach(s => { 
+            let isThisShelfWin = s.type === 'fixed' ? fFixedWin : isWinH;
+            let sId = s.type === 'fixed' ? `fixed_${s.index}_all` : s.id; 
+            if(isThisShelfWin && !deletedShelves.has(sId)) { 
+                allY.push(s.y); 
+                allY.push(s.y + s.h); 
+            } 
+        });
+        
+        allY.sort((a, b) => a - b);
+        let ySegs = [fPlinth+fBot, ...allY, v.H-fTop];
+        
+        vXs.forEach((vx, i) => { 
+            let isDraggingThis = (draggingVPanel && draggingVPanel.index === i);
+            if (isDraggingThis) { ctx.save(); ctx.globalAlpha = 0.5; ctx.fillStyle = "#3498db"; }
+            
+            for (let s = 0; s < ySegs.length; s += 2) { 
+                let segStartY = ySegs[s];
+                let segEndY = ySegs[s+1];
+                
+                if (segStartY > fPlinth+fBot + 1) { segStartY -= fVExtend; }
+                if (segEndY < v.H-fTop - 1) { segEndY += fVExtend; }
+                
+                let segH = segEndY - segStartY; 
+                if (segH > 0) rectF(vx, segStartY, fVThick, segH, 0.5); 
+            }
+            if (isDraggingThis) ctx.restore();
+        });
+    }
+
+    // --- 扉の段ごとの情報取得準備 ---
+    let vSplit = parseInt(document.getElementById('fDoorVSplit').value || '1');
+    let divYs = fixedVals.map(val => fPlinth + fBot + val);
+    let doorBotY_base = fPlinth + fBot + getVal('fDoorGapB', 2);
+    let doorTopY_base = v.H - fTop - getVal('fDoorGapT', 2);
+    
+    if (vSplit >= 2 && divYs.length < 1) divYs.push(doorBotY_base + (doorTopY_base - doorBotY_base)/2 - fFixedT/2);
+    if (vSplit === 3 && divYs.length < 2) divYs.push(doorBotY_base + (doorTopY_base - doorBotY_base)*2/3 - fFixedT/2);
+
+    let rows = [];
+    if (!isDoorOn) {
+    } else if (vSplit === 1) { 
+        rows.push({ setting: document.getElementById('fDoorCountTop').value, hinge: document.getElementById('fHingeTop').value, bY: doorBotY_base, tY: doorTopY_base, label: 'top' });
+    } else if (vSplit === 2) {
+        let dc1 = divYs[0] + fFixedT / 2;
+        rows.push({ setting: document.getElementById('fDoorCountBot').value, hinge: document.getElementById('fHingeBot').value, bY: doorBotY_base, tY: dc1 - getVal('fDoorGapMid', 2)/2, label: 'bot' });
+        rows.push({ setting: document.getElementById('fDoorCountTop').value, hinge: document.getElementById('fHingeTop').value, bY: dc1 + getVal('fDoorGapMid', 2)/2, tY: doorTopY_base, label: 'top' });
+    } else if (vSplit === 3) {
+        let dc1 = divYs[0] + fFixedT / 2; let dc2 = divYs[1] + fFixedT / 2;
+        rows.push({ setting: document.getElementById('fDoorCountBot').value, hinge: document.getElementById('fHingeBot').value, bY: doorBotY_base, tY: dc1 - getVal('fDoorGapMid', 2)/2, label: 'bot' });
+        rows.push({ setting: document.getElementById('fDoorCountMid').value, hinge: document.getElementById('fHingeMid').value, bY: dc1 + getVal('fDoorGapMid', 2)/2, tY: dc2 - getVal('fDoorGapMid', 2)/2, label: 'mid' });
+        rows.push({ setting: document.getElementById('fDoorCountTop').value, hinge: document.getElementById('fHingeTop').value, bY: dc2 + getVal('fDoorGapMid', 2)/2, tY: doorTopY_base, label: 'top' });
+    }
+
+    const fDoorTopInset = (isSliding || isParting) ? true : (document.getElementById('fDoorTopInset') ? document.getElementById('fDoorTopInset').checked : true);
+    const fDoorBotInset = (isSliding || isParting) ? true : (document.getElementById('fDoorBotInset') ? document.getElementById('fDoorBotInset').checked : false);
+    
+    let doorTopClearance = getVal('fDoorGapT', 2);
+    let doorBotClearance = getVal('fDoorGapB', 2);
+    let doorTopY = (fDoorTopInset ? (v.H - fTop) : v.H) - doorTopClearance;
+    let doorBotY = (fDoorBotInset ? (fPlinth + fBot) : fPlinth) + doorBotClearance;
+
+    if (isDoorOn) {
+        if (vSplit === 1) {
+            rows[0].bY = doorBotY; rows[0].tY = doorTopY;
+        } else if (vSplit === 2) {
+            rows[0].bY = doorBotY; rows[1].tY = doorTopY;
+        } else if (vSplit === 3) {
+            rows[0].bY = doorBotY; rows[2].tY = doorTopY;
+        }
+    }
+
+    let spanBounds = [fSide];
+    let numSpans = (useV && fVCount > 0) ? fVCount + 1 : 1;
+    if (useV && fVCount > 0) { for (let i = 0; i < fVCount; i++) spanBounds.push(vXs[i] + fVThick / 2); }
+    spanBounds.push(v.W - fSide);
+
+    let slidingRows = [];
+    let overlapAmount = 20; 
+    
+    if (isDoorOn && (isSliding || isParting)) {
+        rows.forEach((row, rIdx) => {
+            let fDoorSetting = row.setting.trim().toLowerCase();
+            if (fDoorSetting === '0' || fDoorSetting === 'none' || fDoorSetting === '') return;
+            
+            let panels = parseInt(fDoorSetting);
+            if (isNaN(panels) || panels <= 0) panels = 2;
+            
+            let zIndices = []; let ovRight = []; let totalOverlap = 0;
+            
+            if (isParting) {
+                if (panels === 4) { zIndices = [0, 1, 1, 0]; ovRight = [true, false, true, false]; totalOverlap = 2; } 
+                else {
+                    for(let i=0; i<panels; i++) zIndices.push(i % 2 === 1 ? 1 : 0);
+                    for(let i=0; i<panels; i++) { let ov = (i < panels - 1); ovRight.push(ov); if(ov) totalOverlap++; }
+                }
+            } else { 
+                if (panels === 4) { zIndices = [0, 1, 1, 0]; ovRight = [true, true, true, false]; totalOverlap = 3; } 
+                else if (panels === 3) { zIndices = [0, 1, 2]; ovRight = [true, true, false]; totalOverlap = 2; } 
+                else if (panels === 2) { zIndices = [0, 1]; ovRight = [true, false]; totalOverlap = 1; } 
+                else {
+                    for(let i=0; i<panels; i++) zIndices.push(i);
+                    for(let i=0; i<panels; i++) { let ov = (i < panels - 1); ovRight.push(ov); if(ov) totalOverlap++; }
+                }
+            }
+            
+            let dY = row.bY; let doorH = row.tY - row.bY;
+            let sdInnerW = spanBounds[spanBounds.length-1] - spanBounds[0];
+            let sdX = spanBounds[0];
+            let sdW = (sdInnerW + overlapAmount * totalOverlap) / panels;
+            
+            let rects = []; let curX = sdX;
+            for(let i=0; i<panels; i++) {
+                rects.push({ i: i, x: curX, w: sdW, zIndex: zIndices[i], ovRight: ovRight[i] });
+                curX += sdW - (ovRight[i] ? overlapAmount : 0);
+            }
+            
+            slidingRows.push({ rIdx: rIdx, dY: dY, doorH: doorH, sdInnerW: sdInnerW, sdX: sdX, sdW: sdW, panels: panels, rects: rects, maxZ: Math.max(...zIndices) });
+        });
+    }
+
+    let doorInfos = [];
+    if (!isSliding && !isParting) {
+        rows.forEach(row => {
+            let fDoorSetting = row.setting.trim().toLowerCase();
+            if (fDoorSetting === '0' || fDoorSetting === 'none' || fDoorSetting === '') return;
+
+            let customHinges = [];
+            if (row.hinge) {
+                let normHinge = row.hinge.toUpperCase().replace(/Ｌ/g, 'L').replace(/Ｒ/g, 'R');
+                customHinges = normHinge.split(',').map(s => s.trim().replace(/[^LR]/g, '')).filter(s => s === 'L' || s === 'R');
+            }
+
+            let dY = row.bY; let doorH = row.tY - row.bY;
+            
+            let isAuto = (fDoorSetting === 'auto');
+            let customSpanCounts = [];
+            let isCustomSpan = false;
+
+            if (fDoorSetting.includes(',')) {
+                isCustomSpan = true;
+                customSpanCounts = parseNumList(fDoorSetting);
+            }
+
+            let doorCount = 0; let firstHinge = 'L';
+            if (!isAuto && !isCustomSpan) {
+                if (fDoorSetting === '1l') { doorCount = 1; firstHinge = 'L'; } 
+                else if (fDoorSetting === '1r') { doorCount = 1; firstHinge = 'R'; } 
+                else { doorCount = parseInt(fDoorSetting) || 0; }
+            }
+            
+            if (doorCount === 0 && !isAuto && !isCustomSpan) return;
+            
+            let alignWithV = (!isAuto && !isCustomSpan && doorCount > 0 && doorCount % numSpans === 0);
+            let currentDoorIndex = 0;
+            let outerOverlay = (fDoorOverlay === 'full') ? 16 : (fDoorOverlay === 'half') ? 8 : -2;
+            let gapC = 1;
+
+            if (isAuto || alignWithV || isCustomSpan) {
+                for (let s = 0; s < numSpans; s++) {
+                    let sLeft = spanBounds[s]; let sRight = spanBounds[s+1];
+                    let spanDoorX = sLeft - ((s === 0) ? outerOverlay : -gapC);
+                    let endX = sRight + ((s === numSpans - 1) ? outerOverlay : -gapC);
+                    let spanDoorW = endX - spanDoorX;
+                    
+                    let dPerThisSpan = 1;
+                    if (isCustomSpan) { dPerThisSpan = customSpanCounts.length > s ? customSpanCounts[s] : 0; } 
+                    else if (isAuto) { if (spanDoorW <= 650) dPerThisSpan = 1; else if (spanDoorW <= 1300) dPerThisSpan = 2; else dPerThisSpan = Math.ceil(spanDoorW / 650); } 
+                    else { dPerThisSpan = doorCount / numSpans; }
+
+                    if (dPerThisSpan <= 0) continue; 
+
+                    let dW = spanDoorW / dPerThisSpan;
+                    for (let i = 0; i < dPerThisSpan; i++) {
+                        let gapL = (i === 0) ? 0 : 1; let gapR = (i === dPerThisSpan - 1) ? 0 : 1;
+                        let startX = spanDoorX + i * dW + gapL; let finalW = dW - gapL - gapR;
+                        let isLeftHinge = true;
+                        
+                        if (customHinges.length > currentDoorIndex) { isLeftHinge = (customHinges[currentDoorIndex] === 'L'); } 
+                        else { 
+                            if (isCustomSpan || isAuto) { if (dPerThisSpan === 1) { if (s === numSpans - 1 && numSpans > 1) isLeftHinge = false; else isLeftHinge = true; } else { isLeftHinge = (i % 2 === 0); } } 
+                            else { if (doorCount === 1) isLeftHinge = (firstHinge === 'L'); else isLeftHinge = (i % 2 === 0); }
+                        }
+                        let explicitH = (customHinges.length > currentDoorIndex);
+                        doorInfos.push({x: startX, y: dY, w: finalW, h: doorH, hinge: isLeftHinge ? 'L' : 'R', rowLabel: row.label, explicitHinge: explicitH});
+                        currentDoorIndex++;
+                    }
+                }
+            } else {
+                let spanDoorX = fSide - outerOverlay; let endX = (v.W - fSide) + outerOverlay;
+                let totalDoorW = endX - spanDoorX; let dW = totalDoorW / doorCount;
+                for (let i = 0; i < doorCount; i++) {
+                    let gapL = (i === 0) ? 0 : 1; let gapR = (i === doorCount - 1) ? 0 : 1;
+                    let startX = spanDoorX + i * dW + gapL; let finalW = dW - gapL - gapR;
+                    let isLeftHinge = true;
+                    if (customHinges.length > currentDoorIndex) { isLeftHinge = (customHinges[currentDoorIndex] === 'L'); } 
+                    else { if (doorCount === 1) isLeftHinge = (firstHinge === 'L'); else isLeftHinge = (i % 2 === 0); }
+                    
+                    let explicitH = (customHinges.length > currentDoorIndex);
+                    doorInfos.push({x: startX, y: dY, w: finalW, h: doorH, hinge: isLeftHinge ? 'L' : 'R', rowLabel: row.label, explicitHinge: explicitH});
+                    currentDoorIndex++;
+                }
+            }
+        });
+    }
+
+    if (doorInfos.length > 0 && !isSliding && !isParting) {
+        let hasHingeWarning = false; let warningDoorIndex = -1; let warningTierLabel = "";
+        let pillarZones = []; pillarZones.push({min: 0, max: fSide}); 
+        if (useV && fVCount > 0) { vXs.forEach(vx => { pillarZones.push({min: vx, max: vx + fVThick}); }); }
+        pillarZones.push({min: v.W - fSide, max: v.W}); 
+
+        function isHingeSupported(hingeX) { let margin = 25; for (let zone of pillarZones) { if (hingeX >= zone.min - margin && hingeX <= zone.max + margin) return true; } return false; }
+
+        doorInfos.forEach((d, i) => {
+            if (d.explicitHinge) return;
+            let currentHingeX = (d.hinge === 'L') ? d.x : d.x + d.w; let oppositeHingeX = (d.hinge === 'L') ? d.x + d.w : d.x;
+            let canCurrent = isHingeSupported(currentHingeX); let canOpposite = isHingeSupported(oppositeHingeX);
+            if (!canCurrent) { if (canOpposite) { d.hinge = (d.hinge === 'L') ? 'R' : 'L'; } else { hasHingeWarning = true; if (warningDoorIndex === -1) { warningTierLabel = d.rowLabel === 'top' ? '上段' : (d.rowLabel === 'mid' ? '中段' : '下段'); let doorsInRow = doorInfos.filter(dd => dd.rowLabel === d.rowLabel); warningDoorIndex = doorsInRow.indexOf(d) + 1; } } }
+        });
+
+        if(!_isDXF) {
+            ctx.save(); ctx.fillStyle = "#ffffff"; ctx.globalAlpha = 0.85; 
+            doorInfos.forEach(d => { ctx.fillRect(oX + d.x*scale, oY - (d.y+d.h)*scale, d.w*scale, d.h*scale); });
+            ctx.restore();
+        }
+
+        let doorDashPattern = [24 * scale, 6 * scale, 2 * scale, 6 * scale]; let doorLineW = 0.3; let drawnDimRow = null;
+        let drawnKamachiDimRow = {}; 
+        
+        doorInfos.forEach((d, i) => {
+            rectF(d.x, d.y, d.w, d.h, 1.0);
+            
+            let isDrawKamachiDim = false;
+            if (!drawnKamachiDimRow[d.rowLabel]) {
+                isDrawKamachiDim = true;
+                drawnKamachiDimRow[d.rowLabel] = true;
+            }
+            
+            drawDoorDecoration(d.x, d.y, d.w, d.h, i, isDrawKamachiDim);
+            
+            // ★開き扉の引手描画と寸法★
+            if (useHikite) {
+                if (hType === 'normal') {
+                    let isRightSide = (d.hinge === 'L'); 
+                    let hX = isRightSide ? (d.x + d.w - hEdge - hW) : (d.x + hEdge);
+                    
+                    let hCenterY = (d.y + d.h) - hH;
+                    
+                    if (hCenterY < d.y + hL/2 + 10) hCenterY = d.y + hL/2 + 10;
+                    if (hCenterY > d.y + d.h - hL/2 - 10) hCenterY = d.y + d.h - hL/2 - 10;
+                    let hY = hCenterY - hL/2;
+                    
+                    rectF(hX, hY, hW, hL, 0.5);
+
+                    if (useHikiteDim) {
+                        let cx = hX + hW / 2;
+                        let refX = isRightSide ? (d.x + d.w) : d.x; 
+                        
+                        drawDim(scale, oX, oY, Math.min(refX, cx), hCenterY, Math.max(refX, cx), hCenterY, -30, Math.round(Math.abs(cx - refX)).toString(), false, 0, `dim_door_hikite_x_${i}`);
+                        drawDim(scale, oX, oY, cx, 0, cx, hCenterY, isRightSide ? 30 : -30, Math.round(hCenterY).toString(), true, 0, `dim_door_hikite_y_${i}`);
+                    }
+                }
+            }
+
+            if (d.hinge === 'L') { 
+                lineF(d.x + d.w, d.y, d.x, d.y + d.h/2, doorLineW, doorDashPattern); 
+                lineF(d.x + d.w, d.y + d.h, d.x, d.y + d.h/2, doorLineW, doorDashPattern); 
+            } else { 
+                lineF(d.x, d.y, d.x + d.w, d.y + d.h/2, doorLineW, doorDashPattern); 
+                lineF(d.x, d.y + d.h, d.x + d.w, d.y + d.h/2, doorLineW, doorDashPattern); 
+            }
+            if (drawnDimRow === null) drawnDimRow = d.rowLabel;
+            if (d.rowLabel === drawnDimRow) drawDim(scale, oX, oY, d.x, d.y, d.x + d.w, d.y, -60, Math.round(d.w).toString(), false, 0, `dim_door_w_${i}`);
+        });
+
+        let rowRightDoors = {};
+        doorInfos.forEach(d => { if (!rowRightDoors[d.rowLabel] || d.x > rowRightDoors[d.rowLabel].x) rowRightDoors[d.rowLabel] = d; });
+        Object.values(rowRightDoors).forEach((d, i) => { drawDim(scale, oX, oY, d.x + d.w, d.y + d.h, d.x + d.w, d.y, 80 + i*40, Math.round(d.h).toString(), true, 0, `dim_door_h_right_${d.rowLabel}`); });
+
+        if (!_isDXF) {
+            let minX = Math.min(...doorInfos.map(d => d.x)); let maxX = Math.max(...doorInfos.map(d => d.x + d.w));
+            doorEdgeHitboxes.push({ id: 'door_top', y: oY - doorTopY*scale, minX: oX + minX*scale, maxX: oX + maxX*scale });
+            doorEdgeHitboxes.push({ id: 'door_bot', y: oY - doorBotY*scale, minX: oX + minX*scale, maxX: oX + maxX*scale });
+            if (hasHingeWarning) {
+                ctx.save(); ctx.fillStyle = "rgba(231, 76, 60, 0.15)"; ctx.fillRect(oX, oY - v.H*scale, v.W*scale, v.H*scale);
+                ctx.fillStyle = "#c0392b"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
+                ctx.fillText(`⚠️ 警告：${warningTierLabel}の左から ${warningDoorIndex} 枚目の扉の丁番を取り付ける方立がありません！`, oX + (v.W*scale)/2, oY - (v.H*scale)/2 - 15);
+                ctx.font = "14px sans-serif"; ctx.fillText("自動補正をストップしました。構造上無理がないか確認してください。", oX + (v.W*scale)/2, oY - (v.H*scale)/2 + 15); ctx.restore();
+            }
+        }
+        
+        if (doorTopClearance !== 0) { let bY = fDoorTopInset ? (v.H - fTop) : v.H; drawDim(scale, oX, oY, v.W, bY, v.W, doorTopY, -80, Math.abs(Math.round(doorTopClearance)).toString(), true, 0, 'dim_door_tc'); }
+        if (doorBotClearance !== 0) { let bY = fDoorBotInset ? (fPlinth + fBot) : fPlinth; drawDim(scale, oX, oY, v.W, doorBotY, v.W, bY, -80, Math.abs(Math.round(doorBotClearance)).toString(), true, 0, 'dim_door_bc'); }
+    }
+
+    if (isDoorOn && (isSliding || isParting)) {
+        if(!_isDXF) {
+            ctx.save(); ctx.fillStyle = "#ffffff"; ctx.globalAlpha = 0.85; 
+            let totalMinX = spanBounds[0]; let totalMaxX = spanBounds[spanBounds.length-1];
+            slidingRows.forEach(sr => {
+                ctx.fillRect(oX + totalMinX*scale, oY - (sr.dY+sr.doorH)*scale, (totalMaxX - totalMinX)*scale, sr.doorH*scale);
+            });
+            ctx.restore();
+        }
+
+        slidingRows.forEach(sr => {
+            let sortedRects = [...sr.rects].sort((a, b) => a.zIndex - b.zIndex);
+            
+            if(!_isDXF) {
+                sortedRects.forEach(d => {
+                    ctx.fillStyle = "#ffffff"; 
+                    ctx.fillRect(oX + d.x*scale, oY - (sr.dY+sr.doorH)*scale, d.w*scale, sr.doorH*scale); 
+                });
+            }
+
+            sortedRects.forEach(d => {
+                let dashPattern = [4 * scale, 3 * scale];
+                let isLeftHidden = false;
+                let leftDoor = sr.rects.find(r => r.i === d.i - 1);
+                if (leftDoor && leftDoor.ovRight && leftDoor.zIndex > d.zIndex) isLeftHidden = true;
+                
+                let isRightHidden = false;
+                if (d.ovRight) {
+                    let rightDoor = sr.rects.find(r => r.i === d.i + 1);
+                    if (rightDoor && rightDoor.zIndex > d.zIndex) isRightHidden = true;
+                }
+
+                lineF(d.x, sr.dY, d.x + d.w, sr.dY, 1.0);
+                lineF(d.x, sr.dY + sr.doorH, d.x + d.w, sr.dY + sr.doorH, 1.0);
+                if (isLeftHidden) lineF(d.x, sr.dY, d.x, sr.dY + sr.doorH, 0.5, dashPattern);
+                else lineF(d.x, sr.dY, d.x, sr.dY + sr.doorH, 1.0);
+                if (isRightHidden) lineF(d.x + d.w, sr.dY, d.x + d.w, sr.dY + sr.doorH, 0.5, dashPattern);
+                else lineF(d.x + d.w, sr.dY, d.x + d.w, sr.dY + sr.doorH, 1.0);
+
+                let isDrawKamachiDim = (d.i === 0);
+                drawDoorDecoration(d.x, sr.dY, d.w, sr.doorH, `${sr.rIdx}_${d.i}`, isDrawKamachiDim);
+                
+                // ★引き戸・引き分けの引手描画と寸法★
+                if (useHikite) {
+                    if (hType === 'normal') {
+                        let isRightSide = (d.i >= sr.panels / 2);
+                        let hX = isRightSide ? (d.x + d.w - hEdge - hW) : (d.x + hEdge);
+                        
+                        let hCenterY = (sr.dY + sr.doorH) - hH;
+                        
+                        if (hCenterY < sr.dY + hL/2 + 10) hCenterY = sr.dY + hL/2 + 10;
+                        if (hCenterY > sr.dY + sr.doorH - hL/2 - 10) hCenterY = sr.dY + sr.doorH - hL/2 - 10;
+                        let hY = hCenterY - hL/2;
+                        
+                        rectF(hX, hY, hW, hL, 0.5);
+
+                        if (useHikiteDim) {
+                            let cx = hX + hW / 2;
+                            let refX = isRightSide ? (d.x + d.w) : d.x;
+                            
+                            drawDim(scale, oX, oY, Math.min(refX, cx), hCenterY, Math.max(refX, cx), hCenterY, -30, Math.round(Math.abs(cx - refX)).toString(), false, 0, `dim_sd_hikite_x_${sr.rIdx}_${d.i}`);
+                            drawDim(scale, oX, oY, cx, 0, cx, hCenterY, isRightSide ? 30 : -30, Math.round(hCenterY).toString(), true, 0, `dim_sd_hikite_y_${sr.rIdx}_${d.i}`);
+                        }
+                    }
+                }
+            });
+            
+            if (!_isDXF) {
+                doorEdgeHitboxes.push({ id: 'door_top', y: oY - doorTopY*scale, minX: oX + sr.sdX*scale, maxX: oX + (sr.sdX+sr.sdInnerW)*scale });
+                doorEdgeHitboxes.push({ id: 'door_bot', y: oY - doorBotY*scale, minX: oX + sr.sdX*scale, maxX: oX + (sr.sdX+sr.sdInnerW)*scale });
+            }
+            
+            if (sr.rIdx === 0) {
+                for(let i=0; i<sr.panels; i++) {
+                    drawDim(scale, oX, oY, sr.rects[i].x, sr.dY, sr.rects[i].x + sr.rects[i].w, sr.dY, -60, Math.round(sr.rects[i].w).toString(), false, 0, `dim_sd_w_${i}`);
+                }
+            }
+            let rightX = spanBounds[spanBounds.length-1];
+            drawDim(scale, oX, oY, rightX, sr.dY + sr.doorH, rightX, sr.dY, 80 + sr.rIdx*40, Math.round(sr.doorH).toString(), true, 0, `dim_sd_h_${sr.rIdx}`);
+        });
+        
+        if (doorTopClearance !== 0) { let bY = fDoorTopInset ? (v.H - fTop) : v.H; drawDim(scale, oX, oY, v.W, bY, v.W, doorTopY, -80, Math.abs(Math.round(doorTopClearance)).toString(), true, 0, 'dim_door_tc'); }
+        if (doorBotClearance !== 0) { let bY = fDoorBotInset ? (fPlinth + fBot) : fPlinth; drawDim(scale, oX, oY, v.W, doorBotY, v.W, bY, -80, Math.abs(Math.round(doorBotClearance)).toString(), true, 0, 'dim_door_bc'); }
+    }
+
+    /* --- 断面図 --- */
+    const secX = oX + (v.W + fSecOff) * scale;
+    let topD = (fDoorTopInset && isDoorOn && !isInsetType) ? v.D : bodyD; 
+    let botD = (fDoorBotInset && isDoorOn && !isInsetType) ? v.D : bodyD; 
+    let baseD = bodyD;
+
+    if(!_isDXF) {
+        ctx.beginPath(); ctx.strokeStyle = "#000"; ctx.lineWidth = 1.0; ctx.setLineDash([]);
+        ctx.moveTo(secX + 0, oY - 0); ctx.lineTo(secX + 0, oY - v.H*scale); ctx.lineTo(secX + topD*scale, oY - v.H*scale);
+        ctx.lineTo(secX + topD*scale, oY - (v.H - fTop)*scale);
+        if (topD !== bodyD) ctx.lineTo(secX + bodyD*scale, oY - (v.H - fTop)*scale);
+        ctx.lineTo(secX + bodyD*scale, oY - (fPlinth + fBot)*scale);
+        if (botD !== bodyD) { ctx.lineTo(secX + botD*scale, oY - (fPlinth + fBot)*scale); ctx.lineTo(secX + botD*scale, oY - fPlinth*scale); ctx.lineTo(secX + bodyD*scale, oY - fPlinth*scale); } 
+        else { ctx.lineTo(secX + bodyD*scale, oY - fPlinth*scale); }
+        ctx.lineTo(secX + baseD*scale, oY - fPlinth*scale); ctx.lineTo(secX + baseD*scale, oY - 0); ctx.closePath(); ctx.stroke();
+    } else {
+        const l = (x1, y1, x2, y2) => { outLine(secX + x1*scale, oY - y1*scale, secX + x2*scale, oY - y2*scale, 1.0); };
+        l(0, 0, 0, v.H); l(0, v.H, topD, v.H); l(topD, v.H, topD, v.H - fTop);
+        if (topD !== bodyD) l(topD, v.H - fTop, bodyD, v.H - fTop); l(bodyD, v.H - fTop, bodyD, fPlinth + fBot);
+        if (botD !== bodyD) { l(bodyD, fPlinth + fBot, botD, fPlinth + fBot); l(botD, fPlinth + fBot, botD, fPlinth); l(botD, fPlinth, baseD, fPlinth); } 
+        else { l(bodyD, fPlinth + fBot, baseD, fPlinth); } l(baseD, fPlinth, baseD, 0); l(baseD, 0, 0, 0);
+    }
+
+    const lS = (x, y, x2, y2, lw=0.6) => { outLine(secX + x*scale, oY - y*scale, secX + x2*scale, oY - y2*scale, lw); };
+    
+    let tStartX = tenGachi ? 0 : 20;
+    let bStartX = chiGachi ? 0 : 20;
+    lS(tStartX, v.H-fTop, bodyD, v.H-fTop); 
+    lS(bStartX, fPlinth+fBot, bodyD, fPlinth+fBot); 
+    lS(0, fPlinth, baseD, fPlinth); 
+    
+    let backLineTopY = tenGachi ? v.H-fTop : v.H;
+    let backLineBotY = chiGachi ? fPlinth+fBot : fPlinth;
+    lS(20, backLineBotY, 20, backLineTopY); 
+    
+    if (isBackOn) {
+        let bpX = fBackOff; let bpY1 = fPlinth + fBot - fBackIns; let bpY2 = v.H - fTop + fBackIns; let bpH = bpY2 - bpY1;
+        if(!_isDXF) { 
+            ctx.save(); ctx.beginPath(); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.5; 
+            ctx.moveTo(secX + bpX*scale, oY - (v.H - fTop)*scale); 
+            ctx.lineTo(secX + (bpX + fBackT)*scale, oY - (v.H - fTop)*scale); 
+            ctx.moveTo(secX + bpX*scale, oY - (fPlinth + fBot)*scale); 
+            ctx.lineTo(secX + (bpX + fBackT)*scale, oY - (fPlinth + fBot)*scale); 
+            ctx.stroke(); ctx.restore(); 
+        }
+        outRect(secX + bpX*scale, oY - bpY2*scale, fBackT*scale, bpH*scale, 0.8);
+        drawDim(scale, secX, oY, 0, v.H, fBackOff + fBackT, v.H, 60, (fBackOff + fBackT).toString(), false, 0, 'dim_sec_back');
+    }
+
+    // ★ 扉OFF時の可動棚・固定棚の隙間ゼロ化（側板とツライチ）
+    let shelfFront = bodyD; 
+    if (isDoorOn) { 
+        if (isSliding || isParting) {
+            let maxZGlobal = 0;
+            slidingRows.forEach(sr => { if (sr.maxZ > maxZGlobal) maxZGlobal = sr.maxZ; });
+            let sdTrackZ = 20; 
+            let totalDoorDepth = sdTrackZ + (maxZGlobal + 1) * fDoorT + maxZGlobal * gap;
+            shelfFront = v.D - totalDoorDepth - 15;
+        } else if (fDoorOverlay === 'inset') {
+            shelfFront = v.D - fDoorT - 15; 
+        } else {
+            shelfFront = bodyD - 15; 
+        }
+    }
+
+    const bPX = 20 + 35; 
+    const fPX = shelfFront - 25; 
+    const pilW = 12;
+
+    if (useMakuita) { outRect(secX + (bodyD - 20)*scale, oY - (v.H + fMakuitaH)*scale, 20*scale, fMakuitaH*scale, 1.0); }
+
+    let validSectionShelves = [];
+    allShelves.forEach(shelf => { 
+        let rowExists = false; 
+        let isThisShelfWin = shelf.type === 'fixed' ? fFixedWin : isWinH;
+        if (isThisShelfWin) { 
+            let sId = shelf.type === 'fixed' ? `fixed_${shelf.index}_all` : shelf.id; 
+            if (!deletedShelves.has(sId)) rowExists = true; 
+        } else { 
+            for(let k=0; k<=(useV?fVCount:0); k++) { 
+                let sId = `${shelf.id}_${k}`; 
+                if (!deletedShelves.has(sId)) { rowExists = true; break; } 
+            } 
+        } 
+        if (rowExists) validSectionShelves.push(shelf); 
+    });
+
+    validSectionShelves.forEach(shelf => { 
+        // ★ 扉OFF時は fFixedExtend を無効化して側板面に戻す
+        let currentShelfFront = shelf.type === 'fixed' ? shelfFront + (isDoorOn ? fFixedExtend : 0) : shelfFront;
+        outRect(secX+20*scale, oY-(shelf.y+shelf.h)*scale, (currentShelfFront-20)*scale, shelf.h*scale, 0.5); 
+        if (shelf.type === 'movable' && useDash) { 
+            dashRectSec(20, shelf.y + 40, currentShelfFront-20, shelf.h); 
+        } 
+    });
+    
+    if (usePillar) { let allY = []; validSectionShelves.forEach(s => { allY.push(s.y); allY.push(s.y + s.h); }); allY.sort((a, b) => a - b); let ySegs = [fPlinth+fBot, ...allY, v.H-fTop]; [bPX, fPX].forEach(px => { for (let s = 0; s < ySegs.length; s += 2) { let segH = ySegs[s+1] - ySegs[s]; if (segH > 0) outRect(secX+(px-pilW/2)*scale, oY-ySegs[s+1]*scale, pilW*scale, segH*scale, 0.4, "#2980b9"); } }); }
+    if (useDowel && validSectionShelves.some(s => s.type === 'movable')) { let movableYs = validSectionShelves.filter(s => s.type === 'movable').map(s => s.y); movableYs.forEach(sy => { [bPX, fPX].forEach(px => { [sy, sy+50, sy-50].forEach(dy => outCircle(secX+px*scale, oY-dy*scale, 1.5, 1, dy===sy?"#c0392b":"#7f8fa6", true)); }); }); }
+
+    if (doorInfos.length > 0 && !isSliding && !isParting) {
+        let dZ = (fDoorOverlay === 'inset') ? v.D - fDoorT : bodyD;
+        let rowRightDoors = {}; doorInfos.forEach(d => { if (!rowRightDoors[d.rowLabel] || d.x > rowRightDoors[d.rowLabel].x) rowRightDoors[d.rowLabel] = d; });
+        Object.values(rowRightDoors).forEach((d, i) => { 
+            let dx = secX + dZ*scale;
+            let dy = oY - (d.y+d.h)*scale;
+            if (useHikite && hType === 'top_edge') {
+                let lipW = 5 * scale; let cutD = 15 * scale;
+                let botY = dy + d.h*scale;
+                let rightX = dx + fDoorT*scale;
+                
+                outLine(rightX, botY, dx, botY, 1.0); 
+                outLine(rightX, botY, rightX, dy, 1.0); 
+                outLine(rightX, dy, rightX - lipW, dy, 1.0); 
+                outLine(rightX - lipW, dy, dx, dy + cutD, 1.0); 
+                outLine(dx, dy + cutD, dx, botY, 1.0); 
+
+                let gapTop = (d.rowLabel === 'top' || d.rowLabel === undefined) ? getVal('fDoorGapT', 2) : getVal('fDoorGapMid', 2)/2;
+                let stopperTopY = dy - gapTop * scale; 
+                let stopperH = (gapTop + 15) * scale;
+                let stopperW = 20 * scale;
+                outRect(dx - stopperW, stopperTopY, stopperW, stopperH, 0.5);
+                outLine(dx - stopperW, stopperTopY, dx, stopperTopY + stopperH, 0.3); 
+            } else {
+                outRect(dx, dy, fDoorT*scale, d.h*scale, 1.0); 
+            }
+            drawDim(scale, secX, oY, dZ, d.y + d.h, dZ + fDoorT, d.y + d.h, 200 + i*40, fDoorT.toString(), false, 0, `dim_door_t_sec_${i}`); 
+        });
+        drawDim(scale, secX, oY, 0, v.H, v.D, v.H, 200, v.D.toString(), false, 0, 'dim_sec_top'); 
+    } else if (isDoorOn && (isSliding || isParting)) {
+        let sdTrackZ = 20; 
+        slidingRows.forEach((sr) => {
+            let drawnZ = new Set();
+            sr.rects.forEach(d => {
+                if (drawnZ.has(d.zIndex)) return;
+                drawnZ.add(d.zIndex);
+                let zOffset = sdTrackZ + (sr.maxZ - d.zIndex) * (fDoorT + gap);
+                let tz = v.D - zOffset - fDoorT;
+                let dx = secX + tz*scale;
+                let dy = oY - (sr.dY+sr.doorH)*scale;
+                if (useHikite && hType === 'top_edge') {
+                    let lipW = 5 * scale; let cutD = 15 * scale;
+                    let botY = dy + sr.doorH*scale;
+                    let rightX = dx + fDoorT*scale;
+
+                    outLine(rightX, botY, dx, botY, 1.0); 
+                    outLine(rightX, botY, rightX, dy, 1.0); 
+                    outLine(rightX, dy, rightX - lipW, dy, 1.0); 
+                    outLine(rightX - lipW, dy, dx, dy + cutD, 1.0); 
+                    outLine(dx, dy + cutD, dx, botY, 1.0); 
+
+                } else {
+                    outRect(dx, dy, fDoorT*scale, sr.doorH*scale, 1.0);
+                }
+            });
+        });
+        drawDim(scale, secX, oY, 0, v.H, v.D, v.H, 200, v.D.toString(), false, 0, 'dim_sec_top'); 
+    } else { 
+        drawDim(scale, secX, oY, 0, v.H, v.D, v.H, 200, v.D.toString(), false, 0, 'dim_sec_top'); 
+    }
+
+    const planY = oY - (v.H + fPlanOff) * scale;
+    outRect(oX, planY - v.D*scale, v.W*scale, bodyD*scale, 1.0);
+    if (fDoorTopInset && isDoorOn && !isInsetType) { outRect(oX, planY - fDoorT*scale, v.W*scale, fDoorT*scale, 1.0); }
+
+    drawHatching(oX, planY - v.D*scale, fSide*scale, bodyD*scale, scale);
+    drawHatching(oX + (v.W - fSide)*scale, planY - v.D*scale, fSide*scale, bodyD*scale, scale);
+    drawHatching(oX, planY - v.D*scale, v.W*scale, 20*scale, scale);
+    
+    if (useV && fVCount > 0) { 
+        vXs.forEach(vx => { 
+            let vDepth = (isDoorOn && (isSliding || isParting)) ? shelfFront : bodyD;
+            drawHatching(oX + vx*scale, planY - v.D*scale, fVThick*scale, vDepth*scale, scale); 
+        }); 
+    }
+
+    if (isBackOn) {
+        let bpY = planY - v.D*scale + fBackOff*scale; let bpX = fSide - fBackIns; let bpW = v.W - fSide*2 + fBackIns*2;
+        if(!_isDXF) { ctx.save(); ctx.beginPath(); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.5; ctx.moveTo(oX + fSide*scale, bpY); ctx.lineTo(oX + fSide*scale, bpY + fBackT*scale); ctx.moveTo(oX + (v.W - fSide)*scale, bpY); ctx.lineTo(oX + (v.W - fSide)*scale, bpY + fBackT*scale); ctx.stroke(); ctx.restore(); }
+        outRect(oX + bpX*scale, bpY, bpW*scale, fBackT*scale, 0.8);
+        drawDim(scale, oX, planY, 0, v.D, 0, v.D - (fBackOff + fBackT), 120, (fBackOff + fBackT).toString(), true, 0, 'dim_plan_back');
+    }
+
+    if (doorInfos.length > 0 && !isSliding && !isParting) {
+        let py = planY - fDoorT*scale; let planDoors = doorInfos.filter(d => d.rowLabel === doorInfos[0].rowLabel);
+        planDoors.forEach(d => { outRect(oX + d.x*scale, py, d.w*scale, fDoorT*scale, 1.0); });
+        drawDim(scale, oX, planY, 0, 0, 0, fDoorT, 200, fDoorT.toString(), true, 0, 'dim_door_t_plan');
+        drawDim(scale, oX, planY, 0, 0, 0, v.D, 200, v.D.toString(), true, 0, 'dim_plan_left'); 
+    } else if (isDoorOn && (isSliding || isParting)) {
+        let sdTrackZ = 20;
+        let activeSr = slidingRows.find(sr => sr.panels > 0);
+        if (activeSr) {
+            let maxZ = activeSr.maxZ;
+            if(!_isDXF) {
+                ctx.fillStyle = "#ffffff"; 
+                let totalDepth = (maxZ + 1) * fDoorT + maxZ * gap;
+                ctx.fillRect(oX + activeSr.sdX*scale, planY - (sdTrackZ + totalDepth)*scale, activeSr.sdInnerW*scale, totalDepth*scale);
+            }
+            activeSr.rects.forEach(d => {
+                let zOffset = sdTrackZ + (maxZ - d.zIndex) * (fDoorT + gap);
+                let py = planY - (zOffset + fDoorT)*scale;
+                outRect(oX + d.x*scale, py, d.w*scale, fDoorT*scale, 1.0); 
+            });
+        }
+        drawDim(scale, oX, planY, 0, 0, 0, v.D, 200, v.D.toString(), true, 0, 'dim_plan_left');
+    } else { 
+        drawDim(scale, oX, planY, 0, 0, 0, v.D, 200, v.D.toString(), true, 0, 'dim_plan_left'); 
+    }
+
+    let cW = 0; drawDim(scale, oX, oY, 0, v.H, fSide, v.H, 200, fSide.toString(), false, 0, 'dim_bot_side_L'); cW = fSide;
+    
+    if(useV && fVCount > 0) { 
+        for(let i=0; i<fVCount; i++) { 
+            drawDim(scale, oX, oY, cW, v.H, cW+computedSpans[i], v.H, 200, Math.round(computedSpans[i]).toString(), false, 0, `dim_bot_span_${i}`); cW += computedSpans[i]; 
+            drawDim(scale, oX, oY, cW, v.H, cW+fVThick, v.H, 200, fVThick.toString(), false, 0, `dim_bot_vthick_${i}`); cW += fVThick; 
+        }
+        drawDim(scale, oX, oY, cW, v.H, v.W-fSide, v.H, 200, Math.round(computedSpans[fVCount]).toString(), false, 0, `dim_bot_span_${fVCount}`); 
+    } else { drawDim(scale, oX, oY, fSide, v.H, v.W-fSide, v.H, 200, Math.round(computedSpans[0]).toString(), false, 0, 'dim_bot_span_0'); }
+    drawDim(scale, oX, oY, v.W-fSide, v.H, v.W, v.H, 200, fSide.toString(), false, 0, 'dim_bot_side_R');
+    
+    drawDim(scale, oX, oY, 0, v.H, v.W, v.H, 280, v.W.toString(), false, 0, 'dim_bot_overall_W');
+    
+    let totalH = useMakuita ? v.H + fMakuitaH : v.H;
+    drawDim(scale, oX, oY, 0, totalH, 0, 0, 560, totalH.toString(), true, 0, 'dim_left_overall'); 
+
+    const dOff = 350; 
+    if (useMakuita) { drawDim(scale, oX, oY, 0, v.H, 0, v.H + fMakuitaH, dOff, fMakuitaH.toString(), true, 0, 'dim_left_makuita'); }
+    
+    let curY = v.H;
+    drawDim(scale, oX, oY, 0, curY, 0, curY - fTop, dOff, fTop.toString(), true, 0, 'dim_left_top_T'); curY -= fTop;
+    const innerH = v.H - fTop - fBot - fPlinth;
+    drawDim(scale, oX, oY, 0, curY, 0, curY - innerH, dOff, innerH.toString(), true, 0, 'dim_left_inner_H'); curY -= innerH;
+    drawDim(scale, oX, oY, 0, curY, 0, curY - fBot, dOff, fBot.toString(), true, 0, 'dim_left_bot_T'); curY -= fBot;
+    if (fPlinth > 0) { drawDim(scale, oX, oY, 0, curY, 0, 0, dOff + 50, fPlinth.toString(), true, -20, 'dim_left_plinth'); }
+
+    // --- 箱の内側（左端）の固定棚・内寸の連続寸法描画 ---
+    let curY_inner = fPlinth + fBot;
+    for (let i = 0; i < fixedVals.length; i++) {
+        let sY = fPlinth + fBot + fixedVals[i];
+        let clearH = sY - curY_inner;
+        drawDim(scale, oX, oY, fSide, curY_inner, fSide, sY, -60, Math.round(clearH).toString(), true, 0, `dim_fixed_clear_${i}`);
+        drawDim(scale, oX, oY, fSide, sY, fSide, sY + fFixedT, -60, Math.round(fFixedT).toString(), true, 0, `dim_fixed_t_${i}`);
+        curY_inner = sY + fFixedT;
+    }
+    let topY_inner = v.H - fTop;
+    let topClear = topY_inner - curY_inner;
+    if (topClear > 0) {
+        drawDim(scale, oX, oY, fSide, curY_inner, fSide, topY_inner, -60, Math.round(topClear).toString(), true, 0, `dim_fixed_clear_${fixedVals.length}`);
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const canvas = document.getElementById('previewCanvas'); let isD = false, sX = 0, sY = 0;
+
+    function getHoveredDim(cX, cY) {
+        let hitZone = 15 / viewZoom; 
+        for (let hb of dimHitboxes) {
+            if (hb.isVert) { if (Math.abs(cX - hb.x1) < hitZone && cY >= hb.y1 - hitZone && cY <= hb.y2 + hitZone) return hb; } 
+            else { if (Math.abs(cY - hb.y1) < hitZone && cX >= hb.x1 - hitZone && cX <= hb.x2 + hitZone) return hb; }
+        }
+        return null;
+    }
+
+    function getHoveredDoorEdge(cX, cY) {
+        let hitZone = 15 / viewZoom; 
+        for (let hb of doorEdgeHitboxes) { if (Math.abs(cY - hb.y) < hitZone && cX >= hb.minX - hitZone && cX <= hb.maxX + hitZone) return hb; } return null;
+    }
+
+    canvas.addEventListener('mousedown', (e) => { 
+        const r = canvas.getBoundingClientRect();
+        const mX = (e.clientX - r.left)*(canvas.width/r.width); const mY = (e.clientY - r.top)*(canvas.height/r.height);
+        const cX = (mX - viewOffsetX) / viewZoom; const cY = (mY - viewOffsetY) / viewZoom;
+
+        if (isEraserMode) {
+            for (let hb of textHitboxes) {
+                if (cX >= hb.x1 && cX <= hb.x2 && cY >= hb.y1 && cY <= hb.y2) {
+                    if (!hb.isArrow) {
+                        hb.row.style.display = 'none';
+                        eraserHistory.push({ type: 'text', row: hb.row });
+                        drawPreview(); return;
+                    }
+                }
+            }
+            let clickedDim = getHoveredDim(cX, cY);
+            if (clickedDim) {
+                deletedDims.add(clickedDim.id);
+                eraserHistory.push({ type: 'dim', id: clickedDim.id });
+                drawPreview(); return;
+            }
+            let clickedShelf = null;
+            for (let hb of shelfHitboxes) { if (cX >= hb.x1 && cX <= hb.x2 && cY >= hb.y1 && cY <= hb.y2) { clickedShelf = hb; break; } }
+            if (clickedShelf) {
+                deletedShelves.add(clickedShelf.id);
+                eraserHistory.push({ type: 'shelf', id: clickedShelf.id });
+                drawPreview(); return;
+            }
+            return;
+        }
+
+        let clickedText = null; let clickedArrow = null;
+        for (let hb of textHitboxes) {
+            if (cX >= hb.x1 && cX <= hb.x2 && cY >= hb.y1 && cY <= hb.y2) {
+                if (hb.isArrow) clickedArrow = hb; else clickedText = hb; break;
+            }
+        }
+        if (clickedArrow) { dragTargetArrow = { row: clickedArrow.row, startX: cX, startY: cY, startAx: parseFloat(clickedArrow.row.querySelector('.extra-ax').value), startAy: parseFloat(clickedArrow.row.querySelector('.extra-ay').value) }; return; }
+        if (clickedText) { dragTargetText = { row: clickedText.row, startX: cX, startY: cY, startTx: parseFloat(clickedText.row.querySelector('.extra-x').value), startTy: parseFloat(clickedText.row.querySelector('.extra-y').value) }; return; }
+
+        let clickedVPanel = null;
+        for (let hb of vPanelHitboxes) {
+            if (cX >= hb.x1 - 5/viewZoom && cX <= hb.x2 + 5/viewZoom && cY >= hb.y1 && cY <= hb.y2) { clickedVPanel = hb; break; }
+        }
+        if (clickedVPanel) {
+            let currentSpansStr = document.getElementById('fVSpans').value;
+            let numSpans = getVal('fVCount', 2) + 1;
+            let innerW = getVal('w', 1800) - 2 * getVal('fSideT', 20);
+            let fVThick = getVal('fVThick', 20);
+            let tempSpans = Array(numSpans).fill('auto');
+            if (currentSpansStr) {
+                let parts = parseNumList(currentSpansStr);
+                for(let i=0; i<Math.min(parts.length, numSpans); i++) { if (parts[i] !== '') tempSpans[i] = parts[i]; }
+            }
+            let fixedTotal = 0; let autoCount = 0;
+            for(let i=0; i<numSpans; i++) {
+                if (tempSpans[i] === 'auto') autoCount++;
+                else { let v = parseFloat(tempSpans[i]); if(!isNaN(v)) fixedTotal+=v; else tempSpans[i] = 'auto', autoCount++; }
+            }
+            let availableW = innerW - (numSpans-1)*fVThick - fixedTotal;
+            let autoW = autoCount > 0 ? Math.max(0, availableW / autoCount) : 0;
+            let cSpans = tempSpans.map(s => s === 'auto' ? autoW : parseFloat(s));
+            draggingVPanel = { index: clickedVPanel.index, mouseStartX: cX, originalSpans: cSpans, tempSpans: tempSpans }; 
+            return; 
+        }
+
+        let hDoor = getHoveredDoorEdge(cX, cY);
+        if (hDoor) { draggingDoorEdge = { id: hDoor.id }; return; }
+
+        let clickedShelf = null;
+        for (let hb of shelfHitboxes) { if (cX >= hb.x1 && cX <= hb.x2 && cY >= hb.y1 && cY <= hb.y2) { clickedShelf = hb; break; } }
+        if (clickedShelf) { draggingShelf = { id: clickedShelf.id, index: clickedShelf.index, mouseStartX: cX, mouseStartY: cY, currentMouseX: cX, currentMouseY: cY }; drawPreview(); return; }
+
+        let hovered = getHoveredDim(cX, cY);
+        if (hovered && !hovered.id.startsWith('dim_bot_span_') && !hovered.id.startsWith('dim_bot_vthick_')) { 
+            draggingDim = { id: hovered.id, isVert: hovered.isVert, startOffset: dimOffsets[hovered.id] !== undefined ? dimOffsets[hovered.id] : hovered.defaultOffset, startMouse: hovered.isVert ? cX : cY }; 
+        } else { isD = true; sX = e.clientX; sY = e.clientY; }
+    });
+
+    canvas.addEventListener('dblclick', (e) => {
+        const r = canvas.getBoundingClientRect();
+        const mX = (e.clientX - r.left)*(canvas.width/r.width); const mY = (e.clientY - r.top)*(canvas.height/r.height);
+        const cX = (mX - viewOffsetX) / viewZoom; const cY = (mY - viewOffsetY) / viewZoom;
+
+        let hoveredDim = getHoveredDim(cX, cY);
+        if (hoveredDim && hoveredDim.id) {
+            let id = hoveredDim.id;
+
+            // --- 特殊処理 (スパンや中立の移動) ---
+            if (id.startsWith('dim_bot_span_')) {
+                let index = parseInt(id.split('_').pop());
+                let input = prompt(`【スパン幅の直接指定】\n新しい幅を入力してください。(例: 450)\n※ 自動計算に戻す場合は「auto」と入力`);
+                if (input !== null && input.trim() !== '') {
+                    let val = input.trim().toLowerCase().replace(/\s/g, '');
+                    let numSpans = getVal('fVCount', 2) + 1;
+                    let currentStr = document.getElementById('fVSpans').value;
+                    let spanArr = currentStr ? parseNumList(currentStr) : [];
+                    while(spanArr.length < numSpans) spanArr.push('auto');
+                    spanArr[index] = val;
+                    document.getElementById('fVSpans').value = spanArr.join(', ');
+                    drawPreview();
+                }
+                return;
+            } 
+            else if (id.startsWith('dim_bot_vthick_')) {
+                let index = parseInt(id.split('_').pop());
+                let input = prompt(`【中立(中縦)の移動コマンド】\nこの中立を左右に移動させます。\n\n・現在位置から相対移動： +50 (右へ50)、-50 (左へ50)\n・左からの距離を指定： 400\n・右からの距離を指定： R300`);
+                if (input !== null && input.trim() !== '') {
+                    let val = input.trim().toLowerCase().replace(/\s/g, '');
+                    let numSpans = getVal('fVCount', 2) + 1;
+                    let currentSpansStr = document.getElementById('fVSpans').value;
+                    let innerW = getVal('w', 1800) - 2 * getVal('fSideT', 20);
+                    let fVThick = getVal('fVThick', 20);
+                    let tempSpans = Array(numSpans).fill('auto');
+                    if (currentSpansStr) {
+                        let parts = parseNumList(currentSpansStr);
+                        for(let i=0; i<Math.min(parts.length, numSpans); i++) { if (parts[i] !== '') tempSpans[i] = parts[i]; }
+                    }
+                    let fixedTotal = 0; let autoCount = 0;
+                    for(let i=0; i<numSpans; i++) {
+                        if (tempSpans[i] === 'auto') autoCount++;
+                        else { let v = parseFloat(tempSpans[i]); if(!isNaN(v)) fixedTotal+=v; else tempSpans[i] = 'auto', autoCount++; }
+                    }
+                    let availableW = innerW - (numSpans-1)*fVThick - fixedTotal;
+                    let autoW = autoCount > 0 ? Math.max(0, availableW / autoCount) : 0;
+                    let cSpans = tempSpans.map(s => s === 'auto' ? autoW : parseFloat(s));
+                    let leftSpan = cSpans[index];
+                    let rightSpan = cSpans[index+1];
+                    let delta = 0;
+
+                    if (val.startsWith('+')) { delta = parseFloat(val.substring(1)); } 
+                    else if (val.startsWith('-')) { delta = -parseFloat(val.substring(1)); } 
+                    else if (val.startsWith('r')) { let targetRight = parseFloat(val.substring(1)); delta = rightSpan - targetRight; } 
+                    else { let targetLeft = parseFloat(val); delta = targetLeft - leftSpan; }
+
+                    if (!isNaN(delta)) {
+                        cSpans[index] += delta; cSpans[index+1] -= delta;
+                        if (cSpans[index] < 0) { cSpans[index+1] += cSpans[index]; cSpans[index] = 0; }
+                        if (cSpans[index+1] < 0) { cSpans[index] += cSpans[index+1]; cSpans[index+1] = 0; }
+                        for (let i = 0; i < numSpans; i++) { if (i === index || i === index + 1) { tempSpans[i] = Math.round(cSpans[i] * 10) / 10; } }
+                        document.getElementById('fVSpans').value = tempSpans.join(', ');
+                        drawPreview();
+                    }
+                }
+                return;
+            }
+            // --- 棚の内寸(クリアランス)のダイレクト編集 ---
+            else if (id.startsWith('dim_fixed_clear_')) {
+                let idx = parseInt(id.split('_').pop());
+                let fFixedStr = document.getElementById('fFixedHeights').value;
+                let fixedArr = parseNumList(fFixedStr).filter(s => s !== "");
+                let fFixedT = getVal('fFixedT', 20);
+                let fixedVals = fixedArr.map(valStr => parseFloat(valStr)).filter(val => !isNaN(val));
+                fixedVals.sort((a, b) => a - b);
+
+                let fTop = getVal('fTopT', 20);
+                let fBot = getVal('fBotT', 20);
+                let fPlinth = document.getElementById('fPlinthToggle').checked ? getVal('fPlinthH', 60) : 0;
+                let H = getVal('h', 850);
+                let topY = H - fTop - fBot - fPlinth; 
+
+                let old_val = 0;
+                if (idx === 0) {
+                    old_val = fixedVals.length > 0 ? fixedVals[0] : topY;
+                } else if (idx < fixedVals.length) {
+                    old_val = fixedVals[idx] - (fixedVals[idx-1] + fFixedT);
+                } else {
+                    old_val = topY - (fixedVals[fixedVals.length-1] + fFixedT);
+                }
+
+                let promptMsg = `【固定棚間の内寸】の新しい寸法を入力してください:\n※この寸法を変更すると、${idx === fixedVals.length ? '全体の高さ(H)が自動で伸縮します。' : '上部の棚が連動して移動します。'}`;
+                let input = prompt(promptMsg, Math.round(old_val));
+
+                if (input !== null && input.trim() !== '') {
+                    let val = parseFloat(input);
+                    if (!isNaN(val)) {
+                        let delta = val - old_val;
+                        if (idx < fixedVals.length) {
+                            for(let k = idx; k < fixedVals.length; k++) {
+                                fixedVals[k] += delta;
+                            }
+                            document.getElementById('fFixedHeights').value = fixedVals.map(v => Math.round(v)).join(', ');
+                        } else {
+                            document.getElementById('h').value = Math.round(H + delta);
+                        }
+                        drawPreview();
+                    }
+                }
+                return;
+            }
+
+            // --- 汎用入力マッピング ---
+            let targetInputId = null;
+            let promptMsg = "";
+            let currentValue = "";
+            let isSpecial = false;
+
+            const map = {
+                'dim_bot_overall_W': { id: 'w', name: '全幅 (W)' },
+                'dim_sec_top': { id: 'd', name: '見込み (D)' },
+                'dim_plan_left': { id: 'd', name: '見込み (D)' },
+                'dim_bot_side_L': { id: 'fSideT', name: '側板厚' },
+                'dim_bot_side_R': { id: 'fSideT', name: '側板厚' },
+                'dim_left_plinth': { id: 'fPlinthH', name: '台輪高' },
+                'dim_left_makuita': { id: 'fMakuitaH', name: '幕板高' },
+                'dim_door_tc': { id: 'fDoorGapT', name: '扉 上すきま' },
+                'dim_door_bc': { id: 'fDoorGapB', name: '扉 下すきま' },
+                'dim_left_top_T': { id: 'fTopT', name: '天板厚' },
+                'dim_left_bot_T': { id: 'fBotT', name: '底板厚' }
+            };
+
+            if (map[id]) {
+                targetInputId = map[id].id;
+                promptMsg = `【${map[id].name}】の新しい寸法を入力してください:`;
+                currentValue = document.getElementById(targetInputId).value;
+            } else if (id.startsWith('dim_door_t_')) {
+                targetInputId = 'fDoorT';
+                promptMsg = `【扉厚み】の新しい寸法を入力してください:`;
+                currentValue = document.getElementById(targetInputId).value;
+            } else if (id.startsWith('dim_door_hikite_x_') || id.startsWith('dim_sd_hikite_x_')) {
+                targetInputId = 'fHikiteEdge';
+                promptMsg = `【引手 端からのアキ】の新しい寸法を入力してください:`;
+                currentValue = document.getElementById(targetInputId).value;
+            } else if (id.startsWith('dim_door_hikite_y_') || id.startsWith('dim_sd_hikite_y_')) {
+                targetInputId = 'fHikiteH';
+                promptMsg = `【引手 上端からの下がり】の新しい寸法を入力してください:`;
+                currentValue = document.getElementById(targetInputId).value;
+            } else if (id.startsWith('dim_fixed_t_')) {
+                targetInputId = 'fFixedT';
+                promptMsg = `【固定棚・中横の厚み】の新しい寸法を入力してください:`;
+                currentValue = document.getElementById(targetInputId).value;
+            } else if (id.startsWith('dim_kamachi_v_')) {
+                targetInputId = 'fKamachiV';
+                promptMsg = `【縦框 (見付)】の新しい寸法を入力してください:`;
+                currentValue = document.getElementById(targetInputId).value;
+            } else if (id.startsWith('dim_kamachi_top_')) {
+                targetInputId = 'fKamachiTop';
+                promptMsg = `【上桟 (見付)】の新しい寸法を入力してください:`;
+                currentValue = document.getElementById(targetInputId).value;
+            } else if (id.startsWith('dim_kamachi_bot_')) {
+                targetInputId = 'fKamachiBot';
+                promptMsg = `【下桟 (見付)】の新しい寸法を入力してください:`;
+                currentValue = document.getElementById(targetInputId).value;
+            } else if (id === 'dim_left_overall') {
+                targetInputId = 'h';
+                promptMsg = `【全高 (H)】の新しい寸法を入力してください:\n※幕板がある場合は本体部分(H)の変更になります。`;
+                currentValue = document.getElementById(targetInputId).value;
+            } else if (id === 'dim_left_inner_H') {
+                isSpecial = 'innerH';
+                promptMsg = `【内寸(高さ)】の新しい寸法を入力してください:\n※この寸法に合わせて全高(H)が自動で伸縮します。`;
+                let fTop = parseFloat(document.getElementById('fTopT').value) || 0;
+                let fBot = parseFloat(document.getElementById('fBotT').value) || 0;
+                let fPlinth = document.getElementById('fPlinthToggle').checked ? (parseFloat(document.getElementById('fPlinthH').value) || 0) : 0;
+                let H = parseFloat(document.getElementById('h').value) || 0;
+                currentValue = H - fTop - fBot - fPlinth;
+            } else {
+                alert('この寸法は自動計算で割り出されているため、直接変更することはできません。\n基本寸法（WやH）または設定パネルの値を変更してください。');
+                return;
+            }
+
+            let input = prompt(promptMsg, currentValue);
+            if (input !== null && input.trim() !== '') {
+                let val = parseFloat(input);
+                if (!isNaN(val)) {
+                    if (targetInputId) {
+                        document.getElementById(targetInputId).value = val;
+                    } else if (isSpecial === 'innerH') {
+                        let fTop = parseFloat(document.getElementById('fTopT').value) || 0;
+                        let fBot = parseFloat(document.getElementById('fBotT').value) || 0;
+                        let fPlinth = document.getElementById('fPlinthToggle').checked ? (parseFloat(document.getElementById('fPlinthH').value) || 0) : 0;
+                        document.getElementById('h').value = val + fTop + fBot + fPlinth;
+                    }
+                    drawPreview();
+                }
+            }
+        }
+    });
+
+    window.addEventListener('mousemove', (e) => { 
+        const r = canvas.getBoundingClientRect();
+        const mX = (e.clientX - r.left)*(canvas.width/r.width); const mY = (e.clientY - r.top)*(canvas.height/r.height);
+        const cX = (mX - viewOffsetX) / viewZoom; const cY = (mY - viewOffsetY) / viewZoom;
+
+        if (dragTargetText) {
+            let dx = cX - dragTargetText.startX; let dy = cY - dragTargetText.startY;
+            dragTargetText.row.querySelector('.extra-x').value = Math.round(dragTargetText.startTx + dx/lastScale);
+            dragTargetText.row.querySelector('.extra-y').value = Math.round(dragTargetText.startTy - dy/lastScale);
+            drawPreview(); return;
+        }
+        if (dragTargetArrow) {
+            let dx = cX - dragTargetArrow.startX; let dy = cY - dragTargetArrow.startY;
+            dragTargetArrow.row.querySelector('.extra-ax').value = Math.round(dragTargetArrow.startAx + dx/lastScale);
+            dragTargetArrow.row.querySelector('.extra-ay').value = Math.round(dragTargetArrow.startAy - dy/lastScale);
+            drawPreview(); return;
+        }
+
+        if (draggingVPanel) {
+            let dx = cX - draggingVPanel.mouseStartX;
+            let mmDx = dx / lastScale; 
+            
+            let newLeftSpan = draggingVPanel.originalSpans[draggingVPanel.index] + mmDx;
+            let newRightSpan = draggingVPanel.originalSpans[draggingVPanel.index+1] - mmDx;
+            
+            if (newLeftSpan < 0) { newRightSpan += newLeftSpan; newLeftSpan = 0; }
+            if (newRightSpan < 0) { newLeftSpan += newRightSpan; newRightSpan = 0; }
+            
+            let newTempSpans = [...draggingVPanel.tempSpans];
+            for (let i=0; i<newTempSpans.length; i++) {
+                if (i === draggingVPanel.index) newTempSpans[i] = Math.round(newLeftSpan * 10) / 10;
+                else if (i === draggingVPanel.index + 1) newTempSpans[i] = Math.round(newRightSpan * 10) / 10;
+            }
+            document.getElementById('fVSpans').value = newTempSpans.join(', ');
+            drawPreview(); return;
+        }
+
+        if (draggingDoorEdge) {
+            let newWorldY = (oY - cY) / lastScale;
+            let doorTopClearance = getVal('fDoorGapT', 2); let doorBotClearance = getVal('fDoorGapB', 2);
+            let fDoorOverlay = document.getElementById('fDoorOverlay') ? document.getElementById('fDoorOverlay').value : 'inset';
+            let isSliding = fDoorOverlay === 'sliding'; let isParting = fDoorOverlay === 'parting';
+            const fDoorTopInset = (isSliding || isParting) ? true : (document.getElementById('fDoorTopInset') ? document.getElementById('fDoorTopInset').checked : true);
+            const fDoorBotInset = (isSliding || isParting) ? true : (document.getElementById('fDoorBotInset') ? document.getElementById('fDoorBotInset').checked : false);
+            const isPlinthOn = document.getElementById('fPlinthToggle') ? document.getElementById('fPlinthToggle').checked : true;
+            const fTop = getVal('fTopT', 20); const fBot = getVal('fBotT', 20); const fPlinth = isPlinthOn ? getVal('fPlinthH', 60) : 0; const vH = getVal('h', 850);
+            
+            let currentDoorTopY = (fDoorTopInset ? (vH - fTop) : vH) - doorTopClearance; let currentDoorBotY = (fDoorBotInset ? (fPlinth + fBot) : fPlinth) + doorBotClearance;
+
+            if (draggingDoorEdge.id === 'door_top') {
+                let baseY = fDoorTopInset ? (vH - fTop) : vH; let newClearance = Math.round(baseY - newWorldY);
+                if (baseY - newClearance > currentDoorBotY + 10) { document.getElementById('fDoorGapT').value = newClearance; }
+            } else {
+                let baseY = fDoorBotInset ? (fPlinth + fBot) : fPlinth; let newClearance = Math.round(newWorldY - baseY);
+                if (baseY + newClearance < currentDoorTopY - 10) { document.getElementById('fDoorGapB').value = newClearance; }
+            }
+            drawPreview(); return;
+        }
+
+        if (draggingShelf) { draggingShelf.currentMouseX = cX; draggingShelf.currentMouseY = cY; drawPreview(); return; }
+        if (draggingDim) { let deltaCoord = draggingDim.isVert ? (cX - draggingDim.startMouse) : (cY - draggingDim.startMouse); dimOffsets[draggingDim.id] = draggingDim.startOffset - (deltaCoord / lastScale); drawPreview(); return; }
+
+        if (isD) { viewOffsetX += (e.clientX - sX); viewOffsetY += (e.clientY - sY); sX = e.clientX; sY = e.clientY; drawPreview(); } 
+        else {
+            let hoveredVPanel = false;
+            for (let hb of vPanelHitboxes) { if (cX >= hb.x1 - 5/viewZoom && cX <= hb.x2 + 5/viewZoom && cY >= hb.y1 && cY <= hb.y2) { hoveredVPanel = true; break; } }
+            if (hoveredVPanel) { canvas.style.cursor = 'ew-resize'; return; }
+            if (getHoveredDoorEdge(cX, cY)) { canvas.style.cursor = 'ns-resize'; return; }
+            let hoveredShelf = false;
+            for (let hb of shelfHitboxes) { if (cX >= hb.x1 && cX <= hb.x2 && cY >= hb.y1 && cY <= hb.y2) { hoveredShelf = true; break; } }
+            if (hoveredShelf) { canvas.style.cursor = 'move'; return; }
+            let hoveredText = false;
+            for (let hb of textHitboxes) { if (cX >= hb.x1 && cX <= hb.x2 && cY >= hb.y1 && cY <= hb.y2) { hoveredText = true; break; } }
+            if (hoveredText) { canvas.style.cursor = isEraserMode ? 'crosshair' : 'move'; return; }
+            let hoveredDim = getHoveredDim(cX, cY); 
+            if (hoveredDim) {
+                if (hoveredDim.id.startsWith('dim_bot_span_') || hoveredDim.id.startsWith('dim_bot_vthick_') || hoveredDim.id.startsWith('dim_fixed_') || hoveredDim.id.startsWith('dim_kamachi_')) canvas.style.cursor = 'pointer'; 
+                else canvas.style.cursor = hoveredDim.isVert ? 'ew-resize' : 'ns-resize'; 
+            }
+            else canvas.style.cursor = isEraserMode ? 'crosshair' : 'grab'; 
+        }
+    });
+
+    window.addEventListener('mouseup', () => { 
+        isD = false; 
+        if (dragTargetText) { dragTargetText = null; canvas.style.cursor = isEraserMode ? 'crosshair' : 'grab'; }
+        if (dragTargetArrow) { dragTargetArrow = null; canvas.style.cursor = isEraserMode ? 'crosshair' : 'grab'; }
+        if (draggingVPanel) { draggingVPanel = null; canvas.style.cursor = isEraserMode ? 'crosshair' : 'grab'; }
+        if (draggingDoorEdge) { draggingDoorEdge = null; canvas.style.cursor = isEraserMode ? 'crosshair' : 'grab'; }
+        if (draggingDim) { draggingDim = null; canvas.style.cursor = isEraserMode ? 'crosshair' : 'grab'; }
+        if (draggingShelf) {
+            let dx = draggingShelf.currentMouseX - draggingShelf.mouseStartX; let dy = draggingShelf.currentMouseY - draggingShelf.mouseStartY;
+            if (Math.sqrt(dx*dx + dy*dy) > 15) { 
+                deletedShelves.add(draggingShelf.id);
+                if (isEraserMode) eraserHistory.push({ type: 'shelf', id: draggingShelf.id }); 
+            }
+            draggingShelf = null; drawPreview(); canvas.style.cursor = isEraserMode ? 'crosshair' : 'grab';
+        }
+    });
+
+    canvas.addEventListener('wheel', (e) => { e.preventDefault(); const r = canvas.getBoundingClientRect(); const mX = (e.clientX - r.left)*(canvas.width/r.width), mY = (e.clientY - r.top)*(canvas.height/r.height); const z = e.deltaY < 0 ? 1.1 : 0.9; const wX = (mX - viewOffsetX)/viewZoom, wY = (mY - viewOffsetY)/viewZoom; viewZoom = Math.max(0.1, Math.min(viewZoom * z, 10)); viewOffsetX = mX - wX*viewZoom; viewOffsetY = mY - wY*viewZoom; drawPreview(); }, { passive: false });
+});
+
+function initApp() { 
+    ctx = document.getElementById('previewCanvas').getContext('2d'); 
+    addRow("本体", "ポリ合板 / メラミン化粧板");
+    addRow("金物", "スライド丁番 / ダボ");
+    if (typeof updateHikiteUI === 'function') updateHikiteUI();
+    drawPreview(); 
+}
+
+function saveProjectFile() {
+    let data = {
+        inputs: {}, checkboxes: {}, radios: {},
+        dimOffsets: dimOffsets,
+        deletedShelves: Array.from(deletedShelves),
+        deletedDims: Array.from(deletedDims),
+        extraTexts: [], specs: []
+    };
+    document.querySelectorAll('input[type="text"]:not(.extra-txt):not(.extra-x):not(.extra-y):not(.extra-ax):not(.extra-ay):not(.spec-label):not(.spec-value), input[type="number"], select').forEach(el => {
+        if (el.id) data.inputs[el.id] = el.value;
+    });
+    document.querySelectorAll('input[type="checkbox"]:not(.extra-use-arrow)').forEach(el => {
+        if (el.id) data.checkboxes[el.id] = el.checked;
+    });
+    document.querySelectorAll('input[type="radio"]').forEach(el => {
+        if (el.name && el.checked) data.radios[el.name] = el.id;
+    });
+    document.querySelectorAll('#extraTextContainer .text-row').forEach(row => {
+        if (row.style.display !== 'none') {
+            data.extraTexts.push({
+                txt: row.querySelector('.extra-txt').value,
+                x: row.querySelector('.extra-x').value,
+                y: row.querySelector('.extra-y').value,
+                angle: row.querySelector('.extra-rot').dataset.angle,
+                useA: row.querySelector('.extra-use-arrow').checked,
+                ax: row.querySelector('.extra-ax').value,
+                ay: row.querySelector('.extra-ay').value
+            });
+        }
+    });
+    let sl = document.querySelectorAll('.spec-label'); let sv = document.querySelectorAll('.spec-value');
+    for(let i=0; i<sl.length; i++) data.specs.push({l: sl[i].value, v: sv[i].value});
+
+    const blob = new Blob([JSON.stringify(data)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    let pName = document.getElementById('pjName').value || 'project';
+    let dName = document.getElementById('dwgName').value || 'drawing';
+    a.download = pName + '_' + dName + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+function loadProjectFile(input) {
+    const file = input.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (data.inputs) for (let id in data.inputs) if (document.getElementById(id)) document.getElementById(id).value = data.inputs[id];
+            if (data.checkboxes) for (let id in data.checkboxes) if (document.getElementById(id)) document.getElementById(id).checked = data.checkboxes[id];
+            if (data.radios) for (let name in data.radios) if (document.getElementById(data.radios[name])) document.getElementById(data.radios[name]).checked = true;
+            if (data.dimOffsets) dimOffsets = data.dimOffsets;
+            if (data.deletedShelves) deletedShelves = new Set(data.deletedShelves);
+            if (data.deletedDims) deletedDims = new Set(data.deletedDims);
+
+            document.getElementById('specContainer').innerHTML = '';
+            if (data.specs && data.specs.length > 0) data.specs.forEach(sp => addRow(sp.l, sp.v));
+            
+            document.getElementById('extraTextContainer').innerHTML = '';
+            if (data.extraTexts) data.extraTexts.forEach(t => addTextRow(t.txt, t.x, t.y, t.angle, t.useA, t.ax, t.ay));
+
+            if (typeof updateHikiteUI === 'function') updateHikiteUI();
+            input.value = ""; drawPreview();
+        } catch(err) { alert('ファイルの読み込みに失敗しました。'); }
+    };
+    reader.readAsText(file);
+}
+
+function exportDXF() {
+    _dxfStr = "  0\r\nSECTION\r\n  2\r\nENTITIES\r\n";
+    _isDXF = true; _dxfFactor = 1.0; 
+    generateDrawing();
+    _dxfStr += "  0\r\nENDSEC\r\n  0\r\nEOF\r\n";
+    const blob = new Blob([_dxfStr], {type: 'text/plain'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    let pName = document.getElementById('pjName').value || 'project';
+    let dName = document.getElementById('dwgName').value || 'drawing';
+    a.download = pName + '_' + dName + '.dxf';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    _isDXF = false; drawPreview();
+}
+
+function drawPreview() { _isDXF = false; generateDrawing(); }
+function resetViewAndPrint() { viewZoom = 1.0; viewOffsetX = 0; viewOffsetY = 0; drawPreview(); setTimeout(() => window.print(), 200); }
+function syncSlider(axis) { document.getElementById('slide'+axis).value = document.getElementById('off'+axis).value; drawPreview(); }
+function syncInput(axis) { document.getElementById('off'+axis).value = document.getElementById('slide'+axis).value; drawPreview(); }
+function resetToDefault() { location.reload(); }
+</script>
+</body>
+</html>
